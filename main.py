@@ -128,18 +128,9 @@ def rotate_secret_handler(event, context):
                     }
                 )
                 if debug: 
-                    print(f"Destroyed previous secret version: {prev_secret_version.name}")
-            elif prev_secret_action == "DELETE":
-                # delete the previous secret version
-                client.delete_secret_version(
-                    request={
-                        "name": prev_secret_version.name
-                    }
-                )
-                if debug: 
-                    print(f"Deleted previous secret version: {prev_secret_version.name}")
+                    print(f"Destroyed previous secret version: {prev_secret_version.name}")            
             elif prev_secret_action == "DISABLE":
-                # delete the previous secret version
+                # disable the previous secret version
                 client.disable_secret_version(
                     request={
                         "name": prev_secret_version.name
@@ -148,7 +139,7 @@ def rotate_secret_handler(event, context):
                 if debug: 
                     print(f"Disabled previous secret version: {prev_secret_version.name}")
             else:
-                print(f"Unknown previous secret handling value, allowed values are: KEEP, DESTROY, DELETE, DISABLE, did not manage previous version, please handle it manually")
+                print(f"Unknown previous secret handling value, allowed values are: KEEP, DESTROY, DISABLE, did not manage previous version, please handle it manually")
         else:
             print(f"Previous secret version is not enabled, skipping destruction")
         
