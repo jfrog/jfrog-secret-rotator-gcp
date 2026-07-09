@@ -1,0 +1,19 @@
+project_id      = "my-gcp-project"
+region          = "us-central1"
+secret_name     = "jfrog-access-token"
+
+# Rotation schedule — set JFrog identity mapping expires_in to at least 30% longer (46800 for this period)
+rotation_period = "36000s" # 10 hours → use expires_in: 46800 in JFrog OIDC mapping
+
+# JFrog OIDC configuration
+jfrog_host    = "myregistry.jfrog.io"
+provider_name = "gcp-oidc"
+
+# Optional overrides
+# pubsub_topic_name           = "jfrog-secret-rotation"
+# function_name               = "secret-rotation-function"
+# function_service_account_id = "secret-rotator-sa"
+# audience                    = "jfrog_user1"
+# prev_secret_action          = "DESTROY"  # recommended for production; see docs/manual-setup.md
+# jfrog_debug                 = false
+# next_rotation_time          = "2026-07-09T12:00:00Z"

@@ -59,7 +59,7 @@ def rotate_secret_handler(event, context):
     jfrog_debug = os.environ.get('JFROG_DEBUG')
     jfrog_host = os.environ.get('JFROG_HOST')
     # get audience from env var and default to secret name
-    audience = os.environ.get('AUDIENCE', secret_name)
+    audience = os.environ.get('AUDIENCE') or secret_name
     provider_name = os.environ.get('PROVIDER_NAME')
     prev_secret_action = os.environ.get('PREV_SECRET_ACTION', "KEEP")
     print(f"JFROG_DEBUG: {jfrog_debug}")
