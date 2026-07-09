@@ -51,7 +51,6 @@ The cloud run function performs these operations:
 
 `gcloud beta services identity create --service "secretmanager.googleapis.com" --project "$PROJECT_ID"`
 
-
 the result is the secret manager service account, keep it as variable SM_SERVICE_ACCOUNT
 
 
@@ -186,3 +185,5 @@ curl -X POST "https://$ARTIFACTORY_URL/access/api/v1/oidc/$OIDC_PROVIDER_NAME/id
 
 ***important***:
 set jfrog oidc token expiration to expire AFTER the secret rotation duration so we will not reach token expiration before token rotation. it is advisable to set token expiration to at least 30% longer than secret rotation
+
+## Terraform Setup Example
