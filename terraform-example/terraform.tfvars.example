@@ -10,7 +10,8 @@ jfrog_host        = "myregistry.jfrog.io"
 provider_name     = "gcp-oidc"
 create_jfrog_oidc = true
 jfrog_user        = "gcp-user" # must exist in JFrog when create_jfrog_oidc is true
-# jfrog_access_token          = "..."  # or set JFROG_ACCESS_TOKEN env var
+# jfrog_access_token          = "..."  # or set JFROG_ACCESS_TOKEN env var; also seeds the initial secret version
+# bootstrap_jfrog_token       = "..."  # optional override for the initial secret version (defaults to jfrog_access_token)
 
 # Optional overrides
 # jfrog_token_expires_in      = 46800  # defaults to rotation_period × 1.3

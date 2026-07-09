@@ -84,7 +84,7 @@ Optional flags:
 | `--rotation-period` | Interval between rotation notifications (e.g. `36000s`) — **required** for rotation |
 | `--next-rotation-time` | RFC3339 timestamp for the first rotation notification |
 
-The secret is created without a payload. The **first secret version** is written by the rotation function when it handles the first `SECRET_ROTATE` event (see [First secret version](#first-secret-version)).
+The secret is created without a payload in manual setup. With Terraform, the first version is seeded from `jfrog_access_token` (see [Bootstrap secret version](#bootstrap-secret-version)). Otherwise the **first real secret version** is written by the rotation function when it handles the first `SECRET_ROTATE` event (see [First secret version](#first-secret-version)).
 
 ## GCP: Artifact Registry access to the secret
 
@@ -328,15 +328,15 @@ Look for `Successfully rotated secret` in the logs. If rotation fails, common ca
 - JFrog identity mapping `aud` / `email` claims do not match the function service account and audience
 - Pub/Sub or Eventarc invoker permissions missing on the Cloud Run service backing the function — see [Invoker permissions](#invoker-permissions-eventarc--cloud-run). Cloud Run logs showing `lacks {run.routes.invoke} permission` usually mean the **function service account** is missing `run.invoker`, or Pub/Sub is missing `serviceAccountTokenCreator` on that SA.
 
-### Optional: placeholder bootstrap version
+### Bootstrap secret version
 
-Terraform creates a placeholder version (`pending-first-rotation`) so the secret has a version before the first rotation. For manual setup this is optional — the function's `add_secret_version` call creates the first real version. To add a placeholder:
+Terraform seeds the first Secret Manager version with `bootstrap_jfrog_token`, or `jfrog_access_token` when that is unset, so GAR and other consumers can authenticate before the first scheduled rotation. For manual setup, add a real JFrog access token:
 
 ```bash
-echo -n "pending-first-rotation" | gcloud secrets versions add "$SECRET_NAME" --data-file=-
+echo -n "$JFROG_ACCESS_TOKEN" | gcloud secrets versions add "$SECRET_NAME" --data-file=-
 ```
 
-The next successful rotation adds a new version with the JFrog access token (previous version is kept, disabled, or destroyed per `PREV_SECRET_ACTION`).
+The next successful rotation adds a new version with the OIDC-exchanged access token (previous version is kept, disabled, or destroyed per `PREV_SECRET_ACTION`).
 
 ## Helper utilities
 

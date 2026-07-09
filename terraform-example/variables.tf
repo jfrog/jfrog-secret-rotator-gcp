@@ -82,7 +82,14 @@ variable "create_jfrog_oidc" {
 }
 
 variable "jfrog_access_token" {
-  description = "JFrog platform admin access token for OIDC resources. Required when create_jfrog_oidc is true unless JFROG_ACCESS_TOKEN is set."
+  description = "JFrog platform admin access token for OIDC resources. Required when create_jfrog_oidc is true unless JFROG_ACCESS_TOKEN is set. Also used as the initial Secret Manager version when bootstrap_jfrog_token is unset."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "bootstrap_jfrog_token" {
+  description = "JFrog access token for the initial Secret Manager version (GAR and other consumers can use the secret immediately). Defaults to jfrog_access_token when unset."
   type        = string
   sensitive   = true
   default     = null

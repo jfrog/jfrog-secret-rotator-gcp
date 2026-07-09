@@ -59,8 +59,11 @@ After apply, wait for the first rotation (default: ~6 minutes after plan) or tri
 | `audience` | no | `""` | OIDC audience; empty uses secret resource name |
 | `prev_secret_action` | no | `KEEP` | Previous version handling: `KEEP`, `DESTROY`, or `DISABLE` |
 | `jfrog_debug` | no | `false` | Enable debug logging |
+| `bootstrap_jfrog_token` | no | uses `jfrog_access_token` | Initial Secret Manager version for GAR/consumers before first rotation |
 
 See [`terraform.tfvars.example`](../terraform-example/terraform.tfvars.example) for a starter configuration.
+
+The first Secret Manager version is seeded with `bootstrap_jfrog_token`, or `jfrog_access_token` when that is unset, so authenticated GAR remote repositories work immediately after apply. The rotation function replaces it on the first successful `SECRET_ROTATE` event.
 
 ## JFrog OIDC (managed by Terraform)
 

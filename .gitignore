@@ -8,5 +8,8 @@ terraform.tfstate.backup
 *.tfvars
 *.tfstate
 *.tfstate.backup
+*.tfstate.lock.info
 
 terraform-example/.build
+
+__pycache__

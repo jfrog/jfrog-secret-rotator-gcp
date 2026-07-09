@@ -7,6 +7,7 @@ locals {
   rotation_period_seconds   = tonumber(regex("^([0-9]+)s$", var.rotation_period)[0])
   oidc_audience             = var.audience != "" ? var.audience : "projects/${data.google_project.current.number}/secrets/${google_secret_manager_secret.jfrog_token.secret_id}"
   jfrog_token_expires_in    = coalesce(var.jfrog_token_expires_in, ceil(local.rotation_period_seconds * 1.3))
+  bootstrap_secret_data     = coalesce(var.bootstrap_jfrog_token, var.jfrog_access_token, "pending-first-rotation")
 
   function_env_vars = merge(
     {
@@ -89,7 +90,7 @@ resource "google_secret_manager_secret" "jfrog_token" {
 
 resource "google_secret_manager_secret_version" "bootstrap" {
   secret      = google_secret_manager_secret.jfrog_token.id
-  secret_data = "pending-first-rotation"
+  secret_data = local.bootstrap_secret_data
 
   lifecycle {
     ignore_changes = [secret_data]
