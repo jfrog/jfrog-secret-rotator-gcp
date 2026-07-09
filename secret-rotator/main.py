@@ -63,8 +63,7 @@ def rotate_secret_handler(event, context):
     provider_name = os.environ.get('PROVIDER_NAME')
     prev_secret_action = os.environ.get('PREV_SECRET_ACTION', "KEEP")
     print(f"JFROG_DEBUG: {jfrog_debug}")
-    if jfrog_debug == "true" or jfrog_debug == "1":
-        debug = True
+    debug = jfrog_debug == "true" or jfrog_debug == "1"
     if debug:
         print(f"JFROG_HOST: {jfrog_host}")
         print(f"AUDIENCE: {audience}")
@@ -77,12 +76,13 @@ def rotate_secret_handler(event, context):
         print(f"OIDC token payload: {token[token.find('.')+1:token.rfind('.')]}")        
     exchange_response = exchange_oidc_tokens(token, jfrog_host, provider_name, audience, debug)
     
+    if "access_token" not in exchange_response:
+        print(f"ERROR in JFrog exchange response: {exchange_response}")
+        return
     access_token = exchange_response["access_token"]    
-    username = exchange_response["username"]
+    username = exchange_response.get("username", "")
     if debug:
         print(f"JFrog exchange response: Username: {username}")
-    else: 
-        print(f"ERROR in JFrog exchange response")
     # print(f"Access token: {access_token}")
     # create the new payload with the new access token
     #new_payload = {

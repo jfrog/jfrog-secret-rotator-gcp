@@ -20,7 +20,17 @@ output "secret_resource_name" {
 
 output "default_audience" {
   description = "Default OIDC audience when AUDIENCE env var is not set (use in JFrog identity mapping aud claim)."
-  value       = "projects/${data.google_project.current.number}/secrets/${google_secret_manager_secret.jfrog_token.secret_id}"
+  value       = local.oidc_audience
+}
+
+output "jfrog_token_expires_in" {
+  description = "Effective JFrog token expires_in (seconds) for the identity mapping."
+  value       = local.jfrog_token_expires_in
+}
+
+output "create_jfrog_oidc" {
+  description = "Whether Terraform manages the JFrog OIDC provider and identity mapping."
+  value       = var.create_jfrog_oidc
 }
 
 output "configured_audience" {

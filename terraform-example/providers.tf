@@ -18,6 +18,10 @@ terraform {
       source  = "hashicorp/random"
       version = "3.5.1"
     }
+    platform = {
+      source  = "jfrog/platform"
+      version = "2.2.0"
+    }
   }
 }
 
@@ -29,4 +33,9 @@ provider "google" {
 provider "google-beta" {
   project = var.project_id
   region  = var.region
+}
+
+provider "platform" {
+  url          = "https://${var.jfrog_host}"
+  access_token = var.jfrog_access_token
 }

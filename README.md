@@ -47,6 +47,6 @@ sequenceDiagram
 Choose one deployment path:
 
 - **[Manual setup (gcloud & REST API)](docs/manual-setup.md)** — step-by-step `gcloud` commands and JFrog OIDC configuration via curl
-- **[Terraform setup](docs/terraform-setup.md)** — Infrastructure-as-Code via [`terraform-example/`](terraform-example/)
+- **[Terraform setup](docs/terraform-setup.md)** — Infrastructure-as-Code via [`terraform-example/`](terraform-example/); optionally creates JFrog OIDC provider and identity mapping (`create_jfrog_oidc`, default `true`)
 
 Both paths provision the rotation pipeline and grant the Artifact Registry service agent read access to the secret so GAR Connector mode repositories can use the rotated token.

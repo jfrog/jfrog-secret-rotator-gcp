@@ -3,7 +3,10 @@ data "google_project" "current" {
 }
 
 locals {
-  next_rotation_time = coalesce(var.next_rotation_time, timeadd(plantimestamp(), "300s"))
+  next_rotation_time        = coalesce(var.next_rotation_time, timeadd(plantimestamp(), "360s"))
+  rotation_period_seconds   = tonumber(regex("^([0-9]+)s$", var.rotation_period)[0])
+  oidc_audience             = var.audience != "" ? var.audience : "projects/${data.google_project.current.number}/secrets/${google_secret_manager_secret.jfrog_token.secret_id}"
+  jfrog_token_expires_in    = coalesce(var.jfrog_token_expires_in, ceil(local.rotation_period_seconds * 1.3))
 
   function_env_vars = merge(
     {
