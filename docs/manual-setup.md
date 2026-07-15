@@ -12,17 +12,6 @@ PROJECT_ID="my-gcp-project"
 gcloud services enable eventarc.googleapis.com artifactregistry.googleapis.com --project "$PROJECT_ID"
 ```
 
-### Setting `NEXT_ROTATION_TIME`
-
-GCP requires `next_rotation_time` at least 5 minutes in the future (6 minutes is used below for margin):
-
-```bash
-# macOS (BSD date)
-NEXT_ROTATION_TIME=$(date -u -v+6M +"%Y-%m-%dT%H:%M:%SZ")
-# GNU/Linux
-# NEXT_ROTATION_TIME=$(date -u -d "+6 minutes" +"%Y-%m-%dT%H:%M:%SZ")
-```
-
 ## GCP: Secret Manager service identity
 
 ```bash
@@ -45,7 +34,7 @@ PROJECT_ID="my-gcp-project"
 PUBSUB_TOPIC_NAME="my-rotation-topic"
 PUBSUB_SUBSCRIPTION_NAME="my-rotation-subscription"
 REGION="us-central1"
-FUNCTION_NAME="${FUNCTION_NAME:-secret-rotation-function-demo}"
+FUNCTION_NAME="secret-rotation-function-demo"
 
 gcloud pubsub topics create "projects/$PROJECT_ID/topics/$PUBSUB_TOPIC_NAME"
 
@@ -64,11 +53,12 @@ gcloud pubsub subscriptions create "projects/$PROJECT_ID/subscriptions/$PUBSUB_S
 ## GCP: Create the secret
 
 ```bash
+# macOS (BSD date)
+NEXT_ROTATION_TIME=$(date -u -v+6M +"%Y-%m-%dT%H:%M:%SZ")
+# GNU/Linux
+# NEXT_ROTATION_TIME=$(date -u -d "+6 minutes" +"%Y-%m-%dT%H:%M:%SZ")
 SECRET_NAME=jfrog-token-rotating
 ROTATION_PERIOD="36000s"   # e.g. 10 hours — JFrog token expires_in must exceed this
-# GCP requires next_rotation_time when rotation_period is set (minimum 5 minutes in the future)
-NEXT_ROTATION_TIME=$(date -u -v+6M +"%Y-%m-%dT%H:%M:%SZ")   # macOS
-# NEXT_ROTATION_TIME=$(date -u -d "+6 minutes" +"%Y-%m-%dT%H:%M:%SZ")   # GNU/Linux
 
 gcloud secrets create "$SECRET_NAME" \
   --topics="projects/$PROJECT_ID/topics/$PUBSUB_TOPIC_NAME" \
@@ -113,10 +103,11 @@ FUNCTION_SERVICE_ACCOUNT_EMAIL="${FUNCTION_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gs
 gcloud iam service-accounts create "$FUNCTION_SERVICE_ACCOUNT" \
   --display-name="Secret Rotation Service Account"
 
-# Grant permission to manage secrets
+# Grant permission to manage secrets and limit the permission to the specific rotated secret name and its versions
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${FUNCTION_SERVICE_ACCOUNT_EMAIL}" \
-  --role="roles/secretmanager.admin"
+  --role="roles/secretmanager.editor" \
+  --condition="expression=resource.name.startsWith(\"projects/$PROJECT_NUMBER/secrets/$SECRET_NAME\"),title=limit to single secret,description=limit permissions to only apply on the rotated secret)"
 ```
 
 ### Deploy function
@@ -403,7 +394,7 @@ Run these commands to remove GCP resources created by the manual setup above. Se
 # Variables — adjust to match your deployment
 PROJECT_ID="my-gcp-project"
 REGION="us-central1"
-FUNCTION_NAME="${FUNCTION_NAME:-secret-rotation-function-demo}"
+FUNCTION_NAME="secret-rotation-function-demo"
 SECRET_NAME="jfrog-token-rotating"
 PUBSUB_TOPIC_NAME="my-rotation-topic"
 PUBSUB_SUBSCRIPTION_NAME="my-rotation-subscription"
@@ -432,7 +423,7 @@ gcloud pubsub topics delete "$PUBSUB_TOPIC_NAME" --quiet
 # 6. Remove project IAM binding for the function service account
 gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${FUNCTION_SERVICE_ACCOUNT_EMAIL}" \
-  --role="roles/secretmanager.admin" \
+  --role="roles/secretmanager.editor" \
   --quiet 2>/dev/null || true
 
 # 7. Delete the function service account
