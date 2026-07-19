@@ -111,10 +111,16 @@ resource "google_service_account" "rotator" {
   project      = var.project_id
 }
 
-resource "google_project_iam_member" "rotator_secret_admin" {
+resource "google_project_iam_member" "rotator_secret_editor" {
   project = var.project_id
-  role    = "roles/secretmanager.admin"
+  role    = "roles/secretmanager.editor"
   member  = "serviceAccount:${google_service_account.rotator.email}"
+
+  condition {
+    title       = "limit to single secret"
+    description = "limit permissions to only apply on the rotated secret"
+    expression  = "resource.name.startsWith(\"projects/${data.google_project.current.number}/secrets/${var.secret_name}\")"
+  }
 }
 
 resource "random_id" "bucket_suffix" {
@@ -177,7 +183,7 @@ resource "google_cloudfunctions2_function" "rotator" {
 
   depends_on = [
     google_project_service.required,
-    google_project_iam_member.rotator_secret_admin,
+    google_project_iam_member.rotator_secret_editor,
     google_storage_bucket_object.function_zip,
   ]
 }
