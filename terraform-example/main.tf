@@ -1,3 +1,5 @@
+# (c) JFrog Ltd. (2026)
+
 data "google_project" "current" {
   project_id = var.project_id
 }
@@ -114,6 +116,7 @@ resource "google_service_account" "rotator" {
 resource "google_project_iam_member" "rotator_secret_editor" {
   project = var.project_id
   role    = "roles/secretmanager.editor"
+  
   member  = "serviceAccount:${google_service_account.rotator.email}"
 
   condition {

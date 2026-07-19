@@ -1,3 +1,5 @@
+# (c) JFrog Ltd. (2026)
+
 output "project_number" {
   description = "GCP project number (used in JFrog identity mapping aud claim)."
   value       = data.google_project.current.number

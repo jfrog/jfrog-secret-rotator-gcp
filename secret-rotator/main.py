@@ -1,3 +1,5 @@
+# (c) JFrog Ltd. (2026)
+
 """Cloud Function handler for JFrog secret rotation via GCP Secret Manager."""
 
 import base64

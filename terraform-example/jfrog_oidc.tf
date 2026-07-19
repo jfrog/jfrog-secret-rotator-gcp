@@ -1,3 +1,5 @@
+# (c) JFrog Ltd. (2026)
+
 resource "platform_oidc_configuration" "gcp" {
   count = var.create_jfrog_oidc ? 1 : 0
 

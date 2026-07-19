@@ -9,7 +9,7 @@ terraform.tfstate.backup
 *.tfstate
 *.tfstate.backup
 *.tfstate.lock.info
-
+.env*
 terraform-example/.build
 
 __pycache__
