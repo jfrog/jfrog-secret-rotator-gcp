@@ -11,5 +11,5 @@ terraform.tfstate.backup
 *.tfstate.lock.info
 .env*
 terraform-example/.build
-
+.cursor/**
 __pycache__
