@@ -57,13 +57,15 @@ After apply, wait for the first rotation (default: ~6 minutes after plan) or tri
 | `function_service_account_id` | no | `secret-rotator-sa` | Function service account short name |
 | `next_rotation_time` | no | ~6 min after plan | RFC3339 timestamp for first rotation |
 | `audience` | no | `""` | OIDC audience; empty uses secret resource name |
-| `prev_secret_action` | no | `KEEP` | Previous version handling: `KEEP`, `DESTROY`, or `DISABLE` |
+| `prev_secret_action` | no | `DESTROY` | Previous version handling: `KEEP`, `DESTROY`, or `DISABLE` |
 | `jfrog_debug` | no | `false` | Enable debug logging |
-| `bootstrap_jfrog_token` | no | uses `jfrog_access_token` | Initial Secret Manager version for GAR/consumers before first rotation |
+| `bootstrap_jfrog_token` | no | `dummy-token` placeholder | Initial Secret Manager version for GAR/consumers before first rotation |
 
 See [`terraform.tfvars.example`](../terraform-example/terraform.tfvars.example) for a starter configuration.
 
-The first Secret Manager version is seeded with `bootstrap_jfrog_token`, or `jfrog_access_token` when that is unset, so authenticated GAR remote repositories work immediately after apply. The rotation function replaces it on the first successful `SECRET_ROTATE` event.
+The first Secret Manager version is seeded with `bootstrap_jfrog_token`, or the placeholder value `dummy-token` when that is unset. The rotation function replaces it on the first successful `SECRET_ROTATE` event.
+
+> **Note:** If you leave `bootstrap_jfrog_token` unset, the initial secret version holds the placeholder `dummy-token`, which is **not** a valid JFrog access token. Consumers such as authenticated GAR remote repositories will fail until the first rotation completes. To have a working token immediately after apply, either wait for the first rotation to complete or pre-set `bootstrap_jfrog_token` with a valid initial JFrog access token.
 
 ## JFrog OIDC (managed by Terraform)
 

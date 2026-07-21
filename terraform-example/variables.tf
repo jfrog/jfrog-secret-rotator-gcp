@@ -63,7 +63,7 @@ variable "audience" {
 variable "prev_secret_action" {
   description = "Action on the previous secret version after rotation: KEEP, DESTROY, or DISABLE."
   type        = string
-  default     = "KEEP"
+  default     = "DESTROY"
 
   validation {
     condition     = contains(["KEEP", "DESTROY", "DISABLE"], var.prev_secret_action)
@@ -84,17 +84,17 @@ variable "create_jfrog_oidc" {
 }
 
 variable "jfrog_access_token" {
-  description = "JFrog platform admin access token for OIDC resources. Required when create_jfrog_oidc is true unless JFROG_ACCESS_TOKEN is set. Also used as the initial Secret Manager version when bootstrap_jfrog_token is unset."
+  description = "JFrog platform admin access token for OIDC resources. Required when create_jfrog_oidc is true unless JFROG_ACCESS_TOKEN is set."
   type        = string
   sensitive   = true
   default     = null
 }
 
 variable "bootstrap_jfrog_token" {
-  description = "JFrog access token for the initial Secret Manager version (GAR and other consumers can use the secret immediately). Defaults to jfrog_access_token when unset."
+  description = "JFrog access token for the initial Secret Manager version. Set this to a valid token so GAR and other consumers can use the secret immediately after apply. Defaults to the placeholder \"dummy-token\" (not a valid token) when not overridden; the rotation function replaces it on the first rotation."
   type        = string
   sensitive   = true
-  default     = null
+  default     = "dummy-token"
 }
 
 variable "jfrog_user" {
