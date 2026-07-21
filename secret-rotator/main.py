@@ -65,7 +65,7 @@ def rotate_secret_handler(event, context):
     jfrog_host = os.environ.get("JFROG_HOST")
     audience = os.environ.get("AUDIENCE") or secret_name
     provider_name = os.environ.get("PROVIDER_NAME")
-    prev_secret_action = os.environ.get("PREV_SECRET_ACTION", "KEEP")
+    prev_secret_action = os.environ.get("PREV_SECRET_ACTION", "DESTROY")
 
     debug = (jfrog_debug or "").lower() in ("true", "1")
     print(f"JFROG_DEBUG: {jfrog_debug}")
