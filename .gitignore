@@ -1,3 +1,4 @@
+# terraform state files
 .terraform
 .terraform.lock.hcl
 terraform.tfstate
@@ -9,7 +10,39 @@ terraform.tfstate.backup
 *.tfstate
 *.tfstate.backup
 *.tfstate.lock.info
-.env*
 terraform-example/.build
-.cursor/**
-__pycache__
+
+# Local secrets and per-machine config
+.env
+.env*
+
+# Build artifacts
+*.egg-info/
+build/
+dist/
+
+# Editor, IDE, and AI-assistant state
+.claude/
+.cursor/
+.fly/
+.idea/
+.vscode/
+
+# Python bytecode and tool caches
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+
+
+# Python virtual environments
+.venv/
+venv/
+
+# Test coverage reports
+.coverage
+htmlcov/
+
+# OS cruft
+.DS_Store
