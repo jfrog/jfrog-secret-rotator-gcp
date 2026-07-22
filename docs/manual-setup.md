@@ -131,7 +131,7 @@ Terraform variable names use lowercase snake_case (e.g. `jfrog_host` → `JFROG_
 JFROG_HOST="myregistry.jfrog.io"
 PROVIDER_NAME="gcp-oidc"
 PREV_SECRET_ACTION="KEEP"
-JFROG_DEBUG="true"
+JFROG_DEBUG="false"
 
 gcloud functions deploy "$FUNCTION_NAME" \
   --gen2 \
@@ -249,6 +249,7 @@ Set `JFROG_TOKEN_EXPIRES_IN` to at least 30% longer than `ROTATION_PERIOD` (in s
 ```bash
 # Must exceed ROTATION_PERIOD — 46800 = 36000s × 1.3
 JFROG_TOKEN_EXPIRES_IN=46800
+AZP=$(gcloud iam service-accounts describe $FUNCTION_SERVICE_ACCOUNT_EMAIL --project=$PROJECT_ID --format="value(uniqueId)")
 
 curl -X POST "${JFROG_URL}/access/api/v1/oidc/${PROVIDER_NAME}/identity_mappings" \
   -H "Content-Type: application/json" \
@@ -259,6 +260,7 @@ curl -X POST "${JFROG_URL}/access/api/v1/oidc/${PROVIDER_NAME}/identity_mappings
     \"claims\": {
       \"iss\": \"https://accounts.google.com\",
       \"aud\": \"projects/${PROJECT_NUMBER}/secrets/${SECRET_NAME}\",
+      \"azp\": \"${AZP}\",
       \"email\": \"${FUNCTION_SERVICE_ACCOUNT_EMAIL}\"
     },
     \"token_spec\": {
@@ -316,7 +318,7 @@ gcloud functions logs read "$FUNCTION_NAME" --gen2 --region="$REGION" --limit=50
 Look for `Successfully rotated secret` in the logs. If rotation fails, common causes are:
 
 - `PROVIDER_NAME` on the function does not match the JFrog OIDC provider name
-- JFrog identity mapping `aud` / `email` claims do not match the function service account and audience
+- JFrog identity mapping `aud` / `email or azp` claims do not match the function service account and audience
 - Pub/Sub or Eventarc invoker permissions missing on the Cloud Run service backing the function — see [Invoker permissions](#invoker-permissions-eventarc--cloud-run). Cloud Run logs showing `lacks {run.routes.invoke} permission` usually mean the **function service account** is missing `run.invoker`, or Pub/Sub is missing `serviceAccountTokenCreator` on that SA.
 
 ### Bootstrap secret version
@@ -374,8 +376,8 @@ Each rotation adds a new Secret Manager version. The rotation function can clean
 
 | Value | Behavior | When to use |
 |-------|----------|-------------|
-| `KEEP` | Previous version stays **enabled** | Default. Useful for rollback or debugging; versions accumulate over time. |
-| `DESTROY` | Previous version is **permanently deleted** | Recommended for production. GAR reads `latest`, so old versions are not needed. Reduces secret sprawl and exposure window. |
+| `KEEP` | Previous version stays **enabled** | Useful for rollback or debugging; versions accumulate over time. |
+| `DESTROY` | Previous version is **permanently deleted** | Default. Recommended for production. GAR reads `latest`, so old versions are not needed. Reduces secret sprawl and exposure window. |
 | `DISABLE` | Previous version is **disabled** (not readable, not deleted) | Middle ground: blocks access but retains metadata for audit. |
 
 With `KEEP`, old versions remain readable by anyone with `secretAccessor`. To remove them manually:
