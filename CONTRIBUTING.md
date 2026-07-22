@@ -1,8 +1,6 @@
-# Contributing to jfrog-oss-hello
+# Contributing to jfrog-secret-rotator-gcp
 
-Thanks for your interest. This repository is a hello-world example of a
-JFrog OSS-policy-compliant project; the same workflow applies whether you
-fork it or contribute to it.
+Thanks for your interest. This repository is a jfrog-secret-rotator-gcp google cloud function helper for allowing an auto rotating google secret containing a JFrog short lived token.
 
 ## Contributor License Agreement (CLA)
 
