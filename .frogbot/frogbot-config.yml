@@ -1,0 +1,9 @@
+- params:
+    git:
+      repoName: jfrog-secret-rotator-gcp
+      branches:
+        - main
+    scan:
+      projects:
+        - workingDirs:
+            - "."
