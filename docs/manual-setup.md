@@ -74,7 +74,7 @@ Optional flags:
 | `--rotation-period` | Interval between rotation notifications (e.g. `36000s`) — **required** for rotation |
 | `--next-rotation-time` | RFC3339 timestamp for the first rotation notification |
 
-The secret is created without a payload in manual setup. With Terraform, the first version is seeded from `jfrog_access_token` (see [Bootstrap secret version](#bootstrap-secret-version)). Otherwise the **first real secret version** is written by the rotation function when it handles the first `SECRET_ROTATE` event (see [First secret version](#first-secret-version)).
+The secret is created without a payload in manual setup. With Terraform, the first version is seeded from `bootstrap_jfrog_token`, or a placeholder when that is unset (see [Bootstrap secret version](#bootstrap-secret-version)). Otherwise the **first real secret version** is written by the rotation function when it handles the first `SECRET_ROTATE` event (see [First secret version](#first-secret-version)).
 
 ## GCP: Artifact Registry access to the secret
 
@@ -121,7 +121,7 @@ Run from the repository root and point `--source` at the `secret-rotator` direct
 | `JFROG_HOST` | yes | — | JFrog hostname (e.g. `myregistry.jfrog.io`) |
 | `PROVIDER_NAME` | yes | — | JFrog OIDC provider name (must match the provider created below) |
 | `AUDIENCE` | no | secret resource name | Google OIDC `aud` claim; default format: `projects/<project_number>/secrets/<secret_name>` |
-| `PREV_SECRET_ACTION` | no | `KEEP` | Previous version handling: `KEEP`, `DESTROY`, or `DISABLE` |
+| `PREV_SECRET_ACTION` | no | `DESTROY` | Previous version handling: `KEEP`, `DESTROY`, or `DISABLE` |
 | `JFROG_DEBUG` | no | — | Set to `true` or `1` for debug logs (tokens are never logged) |
 
 Terraform variable names use lowercase snake_case (e.g. `jfrog_host` → `JFROG_HOST`).
@@ -130,7 +130,7 @@ Terraform variable names use lowercase snake_case (e.g. `jfrog_host` → `JFROG_
 # Set variables (omit AUDIENCE to default to the secret resource name at runtime)
 JFROG_HOST="myregistry.jfrog.io"
 PROVIDER_NAME="gcp-oidc"
-PREV_SECRET_ACTION="KEEP"
+PREV_SECRET_ACTION="DESTROY"
 JFROG_DEBUG="false"
 
 gcloud functions deploy "$FUNCTION_NAME" \
@@ -323,7 +323,7 @@ Look for `Successfully rotated secret` in the logs. If rotation fails, common ca
 
 ### Bootstrap secret version
 
-Terraform seeds the first Secret Manager version with `bootstrap_jfrog_token`, or `jfrog_access_token` when that is unset, so GAR and other consumers can authenticate before the first scheduled rotation. For manual setup, add a real JFrog access token:
+Terraform seeds the first Secret Manager version with `bootstrap_jfrog_token`, or the placeholder `dummy-token` when that is unset. Note that the placeholder is **not** a valid token — GAR and other consumers will fail until the first rotation completes. To have a working token immediately, either wait for the first rotation to complete or pre-set `bootstrap_jfrog_token` with a valid initial JFrog access token. For manual setup, add a real JFrog access token:
 
 ```bash
 echo -n "$JFROG_ACCESS_TOKEN" | gcloud secrets versions add "$SECRET_NAME" --data-file=-
@@ -372,7 +372,7 @@ A good rule of thumb is to set `expires_in` to at least **30% longer** than the 
 
 ## Previous secret versions
 
-Each rotation adds a new Secret Manager version. The rotation function can clean up the previous version via `PREV_SECRET_ACTION` (default: `KEEP`):
+Each rotation adds a new Secret Manager version. The rotation function can clean up the previous version via `PREV_SECRET_ACTION` (default: `DESTROY`):
 
 | Value | Behavior | When to use |
 |-------|----------|-------------|
