@@ -24,7 +24,7 @@ Save the resulting service account email as `SM_SERVICE_ACCOUNT`.
 
 ## GCP: Pub/Sub notifications
 
-Read more: https://docs.cloud.google.com/secret-manager/docs/event-notifications
+Read more: <https://docs.cloud.google.com/secret-manager/docs/event-notifications>
 
 ### Create a Pub/Sub topic
 
@@ -58,7 +58,7 @@ NEXT_ROTATION_TIME=$(date -u -v+6M +"%Y-%m-%dT%H:%M:%SZ")
 # GNU/Linux
 # NEXT_ROTATION_TIME=$(date -u -d "+6 minutes" +"%Y-%m-%dT%H:%M:%SZ")
 SECRET_NAME=jfrog-token-rotating
-ROTATION_PERIOD="36000s"   # e.g. 10 hours — JFrog token expires_in must exceed this
+ROTATION_PERIOD="36000s"   # e.g. 10 hours - JFrog token expires_in must exceed this
 
 gcloud secrets create "$SECRET_NAME" \
   --topics="projects/$PROJECT_ID/topics/$PUBSUB_TOPIC_NAME" \
@@ -69,16 +69,20 @@ gcloud secrets create "$SECRET_NAME" \
 Optional flags:
 
 | Flag | Description |
-|------|-------------|
+| ------ | ------------- |
 | `--set-annotations` | Custom annotations on the secret |
-| `--rotation-period` | Interval between rotation notifications (e.g. `36000s`) — **required** for rotation |
+| `--rotation-period` | Interval between rotation notifications (e.g. `36000s`) - **required** for rotation |
 | `--next-rotation-time` | RFC3339 timestamp for the first rotation notification |
 
-The secret is created without a payload in manual setup. With Terraform, the first version is seeded from `bootstrap_jfrog_token`, or a placeholder when that is unset (see [Bootstrap secret version](#bootstrap-secret-version)). Otherwise the **first real secret version** is written by the rotation function when it handles the first `SECRET_ROTATE` event (see [First secret version](#first-secret-version)).
+The secret is created without a payload in manual setup. With Terraform, the first version is seeded from
+`bootstrap_jfrog_token`, or a placeholder when that is unset (see [Bootstrap secret
+version](#bootstrap-secret-version)). Otherwise the **first real secret version** is written by the rotation function
+when it handles the first `SECRET_ROTATE` event (see [First secret version](#first-secret-version)).
 
 ## GCP: Artifact Registry access to the secret
 
-Grant the Artifact Registry service agent `roles/secretmanager.secretAccessor` on the secret so GAR Connector mode repositories can read the rotated token:
+Grant the Artifact Registry service agent `roles/secretmanager.secretAccessor` on the secret so GAR Connector mode
+repositories can read the rotated token:
 
 ```bash
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
@@ -88,7 +92,8 @@ gcloud secrets add-iam-policy-binding "$SECRET_NAME" \
   --role="roles/secretmanager.secretAccessor"
 ```
 
-When creating the GAR Connector mode repository, reference the secret by name (e.g. `jfrog-token-rotating`). GAR reads the `latest` version, so it picks up new tokens after each rotation.
+When creating the GAR Connector mode repository, reference the secret by name (e.g. `jfrog-token-rotating`). GAR reads
+the `latest` version, so it picks up new tokens after each rotation.
 
 ## GCP: Cloud Function (Gen2)
 
@@ -117,12 +122,12 @@ Run from the repository root and point `--source` at the `secret-rotator` direct
 #### Environment variables
 
 | Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `JFROG_HOST` | yes | — | JFrog hostname (e.g. `myregistry.jfrog.io`) |
-| `PROVIDER_NAME` | yes | — | JFrog OIDC provider name (must match the provider created below) |
+| ---------- | ---------- | --------- | ------------- |
+| `JFROG_HOST` | yes | - | JFrog hostname (e.g. `myregistry.jfrog.io`) |
+| `PROVIDER_NAME` | yes | - | JFrog OIDC provider name (must match the provider created below) |
 | `AUDIENCE` | no | secret resource name | Google OIDC `aud` claim; default format: `projects/<project_number>/secrets/<secret_name>` |
 | `PREV_SECRET_ACTION` | no | `DESTROY` | Previous version handling: `KEEP`, `DESTROY`, or `DISABLE` |
-| `JFROG_DEBUG` | no | — | Set to `true` or `1` for debug logs (tokens are never logged) |
+| `JFROG_DEBUG` | no | - | Set to `true` or `1` for debug logs (tokens are never logged) |
 
 Terraform variable names use lowercase snake_case (e.g. `jfrog_host` → `JFROG_HOST`).
 
@@ -145,7 +150,8 @@ gcloud functions deploy "$FUNCTION_NAME" \
   --service-account="${FUNCTION_SERVICE_ACCOUNT_EMAIL}"
 ```
 
-Set `AUDIENCE` only if your JFrog identity mapping uses a fixed audience string instead of the default secret resource name:
+Set `AUDIENCE` only if your JFrog identity mapping uses a fixed audience string instead of the default secret resource
+name:
 
 ```bash
 AUDIENCE="jfrog_user1"   # or projects/${PROJECT_NUMBER}/secrets/${SECRET_NAME}
@@ -159,15 +165,18 @@ gcloud functions deploy "$FUNCTION_NAME" \
 
 ### Invoker permissions (Eventarc / Cloud Run)
 
-Gen2 functions run on Cloud Run. Pub/Sub delivers events via an **Eventarc push subscription** that signs an OIDC token and calls the Cloud Run service. You need **three** IAM bindings:
+Gen2 functions run on Cloud Run. Pub/Sub delivers events via an **Eventarc push subscription** that signs an OIDC token
+and calls the Cloud Run service. You need **three** IAM bindings:
 
 | Principal | Role | Resource |
-|-----------|------|----------|
+| ----------- | ------ | ---------- |
 | Eventarc trigger service account | `roles/run.invoker` | Cloud Run service |
 | Pub/Sub service agent | `roles/run.invoker` | Cloud Run service |
 | Pub/Sub service agent | `roles/iam.serviceAccountTokenCreator` | Function service account |
 
-When you deploy with `--service-account`, that account is used as the **Eventarc trigger identity** (not the Compute Engine default). Pub/Sub must be allowed to mint OIDC tokens for it, or requests arrive unauthenticated and logs show `lacks {run.routes.invoke} permission`.
+When you deploy with `--service-account`, that account is used as the **Eventarc trigger identity** (not the Compute
+Engine default). Pub/Sub must be allowed to mint OIDC tokens for it, or requests arrive unauthenticated and logs show
+`lacks {run.routes.invoke} permission`.
 
 Run **after** the function is deployed:
 
@@ -210,7 +219,8 @@ gcloud eventarc triggers list --location="$REGION" \
   --format="table(name,serviceAccount)" --filter="labels.goog-drz-cloudfunctions-id=${FUNCTION_NAME}"
 ```
 
-Without step 3, Cloud Run logs show `The request was not authenticated` / `lacks {run.routes.invoke} permission` even when step 1–2 appear correct.
+Without step 3, Cloud Run logs show `The request was not authenticated` / `lacks {run.routes.invoke} permission` even
+when step 1-2 appear correct.
 
 ## JFrog OIDC integration
 
@@ -240,14 +250,16 @@ curl -X POST "${JFROG_URL}/access/api/v1/oidc" \
 
 The identity mapping tells JFrog how to map Google OIDC tokens to JFrog users.
 
-> **IMPORTANT:** Ensure `expires_in` is longer than your secret rotation period so the latest secret version always has a valid JFrog access token
+> **IMPORTANT:** Ensure `expires_in` is longer than your secret rotation period so the latest secret version always has
+> a valid JFrog access token
 
 If using multiple mappings, set distinct `priority` values (lower number = higher priority).
 
-Set `JFROG_TOKEN_EXPIRES_IN` to at least 30% longer than `ROTATION_PERIOD` (in seconds). For the default `ROTATION_PERIOD` of `36000s` (10 hours), use `46800` (13 hours):
+Set `JFROG_TOKEN_EXPIRES_IN` to at least 30% longer than `ROTATION_PERIOD` (in seconds). For the default
+`ROTATION_PERIOD` of `36000s` (10 hours), use `46800` (13 hours):
 
 ```bash
-# Must exceed ROTATION_PERIOD — 46800 = 36000s × 1.3
+# Must exceed ROTATION_PERIOD - 46800 = 36000s × 1.3
 JFROG_TOKEN_EXPIRES_IN=46800
 AZP=$(gcloud iam service-accounts describe $FUNCTION_SERVICE_ACCOUNT_EMAIL --project=$PROJECT_ID --format="value(uniqueId)")
 
@@ -275,11 +287,14 @@ curl -X POST "${JFROG_URL}/access/api/v1/oidc/${PROVIDER_NAME}/identity_mappings
 
 ## First secret version
 
-The rotation function creates secret versions — you do not put a JFrog token in Secret Manager manually. After the secret, function, IAM bindings, and JFrog OIDC integration are in place, trigger the first rotation and confirm a version was created.
+The rotation function creates secret versions - you do not put a JFrog token in Secret Manager manually. After the
+secret, function, IAM bindings, and JFrog OIDC integration are in place, trigger the first rotation and confirm a
+version was created.
 
 ### 1. Trigger the first rotation
 
-Schedule the next rotation at least 5 minutes ahead (6 minutes is used below for margin). Secret Manager publishes a `SECRET_ROTATE` event at that time, which invokes the Cloud Function:
+Schedule the next rotation at least 5 minutes ahead (6 minutes is used below for margin). Secret Manager publishes a
+`SECRET_ROTATE` event at that time, which invokes the Cloud Function:
 
 ```bash
 NEXT_ROTATION_TIME=$(date -u -v+6M +"%Y-%m-%dT%H:%M:%SZ")   # macOS
@@ -293,11 +308,12 @@ Wait until `next_rotation_time` passes, then verify (step 3 below).
 
 Alternatively, if you already set `next_rotation_time` at create time, wait for that scheduled time.
 
-> **Note:** IAM changes (Pub/Sub invoker, Secret Manager publisher) can take a minute or two to propagate. If the function is not invoked, wait and trigger again with a fresh `next_rotation_time`.
+> **Note:** IAM changes (Pub/Sub invoker, Secret Manager publisher) can take a minute or two to propagate. If the
+> function is not invoked, wait and trigger again with a fresh `next_rotation_time`.
 
 ### 2. Verify the secret version
 
-List versions — you should see at least one `ENABLED` version after a successful run:
+List versions - you should see at least one `ENABLED` version after a successful run:
 
 ```bash
 gcloud secrets versions list "$SECRET_NAME"
@@ -319,17 +335,24 @@ Look for `Successfully rotated secret` in the logs. If rotation fails, common ca
 
 - `PROVIDER_NAME` on the function does not match the JFrog OIDC provider name
 - JFrog identity mapping `aud` / `email or azp` claims do not match the function service account and audience
-- Pub/Sub or Eventarc invoker permissions missing on the Cloud Run service backing the function — see [Invoker permissions](#invoker-permissions-eventarc--cloud-run). Cloud Run logs showing `lacks {run.routes.invoke} permission` usually mean the **function service account** is missing `run.invoker`, or Pub/Sub is missing `serviceAccountTokenCreator` on that SA.
+- Pub/Sub or Eventarc invoker permissions missing on the Cloud Run service backing the function - see [Invoker
+  permissions](#invoker-permissions-eventarc--cloud-run). Cloud Run logs showing `lacks {run.routes.invoke} permission`
+  usually mean the **function service account** is missing `run.invoker`, or Pub/Sub is missing
+  `serviceAccountTokenCreator` on that SA.
 
 ### Bootstrap secret version
 
-Terraform seeds the first Secret Manager version with `bootstrap_jfrog_token`, or the placeholder `dummy-token` when that is unset. Note that the placeholder is **not** a valid token — GAR and other consumers will fail until the first rotation completes. To have a working token immediately, either wait for the first rotation to complete or pre-set `bootstrap_jfrog_token` with a valid initial JFrog access token. For manual setup, add a real JFrog access token:
+Terraform seeds the first Secret Manager version with `bootstrap_jfrog_token`, or the placeholder `dummy-token` when
+that is unset. Note that the placeholder is **not** a valid token - GAR and other consumers will fail until the first
+rotation completes. To have a working token immediately, either wait for the first rotation to complete or pre-set
+`bootstrap_jfrog_token` with a valid initial JFrog access token. For manual setup, add a real JFrog access token:
 
 ```bash
 echo -n "$JFROG_ACCESS_TOKEN" | gcloud secrets versions add "$SECRET_NAME" --data-file=-
 ```
 
-The next successful rotation adds a new version with the OIDC-exchanged access token (previous version is kept, disabled, or destroyed per `PREV_SECRET_ACTION`).
+The next successful rotation adds a new version with the OIDC-exchanged access token (previous version is kept,
+disabled, or destroyed per `PREV_SECRET_ACTION`).
 
 ## Helper utilities
 
@@ -361,10 +384,11 @@ gcloud secrets versions access latest --secret="$SECRET_NAME"
 
 ## Token expiry vs rotation period
 
-Set JFrog OIDC token expiration (`token_spec.expires_in`, in **seconds**) to expire **after** the secret rotation period so consumers do not hit an expired JFrog token before the next rotation.
+Set JFrog OIDC token expiration (`token_spec.expires_in`, in **seconds**) to expire **after** the secret rotation period
+so consumers do not hit an expired JFrog token before the next rotation.
 
 | `rotation_period` / `ROTATION_PERIOD` | Minimum `expires_in` | Recommended `expires_in` (30% margin) |
-|----------------------------------------|----------------------|----------------------------------------|
+| ---------------------------------------- | ---------------------- | ---------------------------------------- |
 | `3600s` (1 hour) | `3601` | `4680` |
 | `36000s` (10 hours) | `36001` | `46800` |
 
@@ -372,10 +396,11 @@ A good rule of thumb is to set `expires_in` to at least **30% longer** than the 
 
 ## Previous secret versions
 
-Each rotation adds a new Secret Manager version. The rotation function can clean up the previous version via `PREV_SECRET_ACTION` (default: `DESTROY`):
+Each rotation adds a new Secret Manager version. The rotation function can clean up the previous version via
+`PREV_SECRET_ACTION` (default: `DESTROY`):
 
 | Value | Behavior | When to use |
-|-------|----------|-------------|
+| ------- | ---------- | ------------- |
 | `KEEP` | Previous version stays **enabled** | Useful for rollback or debugging; versions accumulate over time. |
 | `DESTROY` | Previous version is **permanently deleted** | Default. Recommended for production. GAR reads `latest`, so old versions are not needed. Reduces secret sprawl and exposure window. |
 | `DISABLE` | Previous version is **disabled** (not readable, not deleted) | Middle ground: blocks access but retains metadata for audit. |
@@ -386,14 +411,16 @@ With `KEEP`, old versions remain readable by anyone with `secretAccessor`. To re
 gcloud secrets versions destroy VERSION_ID --secret="$SECRET_NAME"
 ```
 
-For GAR Connector mode repositories, **`DESTROY` is usually the right choice** — consumers always read the latest version and do not benefit from keeping old tokens.
+For GAR Connector mode repositories, **`DESTROY` is usually the right choice** - consumers always read the latest
+version and do not benefit from keeping old tokens.
 
 ## Teardown
 
-Run these commands to remove GCP resources created by the manual setup above. Set variables to the values you used when creating resources.
+Run these commands to remove GCP resources created by the manual setup above. Set variables to the values you used when
+creating resources.
 
 ```bash
-# Variables — adjust to match your deployment
+# Variables - adjust to match your deployment
 PROJECT_ID="my-gcp-project"
 REGION="us-central1"
 FUNCTION_NAME="secret-rotation-function-demo"
@@ -403,7 +430,7 @@ PUBSUB_SUBSCRIPTION_NAME="my-rotation-subscription"
 FUNCTION_SERVICE_ACCOUNT="jfrog-secret-rotator-sa"
 FUNCTION_SERVICE_ACCOUNT_EMAIL="${FUNCTION_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com"
 
-# 1. Delete Cloud Function (Gen2) — also removes the Eventarc trigger and Cloud Run service
+# 1. Delete Cloud Function (Gen2) - also removes the Eventarc trigger and Cloud Run service
 gcloud functions delete "$FUNCTION_NAME" --gen2 --region="$REGION" --quiet
 
 # 2. Delete any orphaned Eventarc triggers (if step 1 left any behind)
@@ -432,6 +459,7 @@ gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
 gcloud iam service-accounts delete "$FUNCTION_SERVICE_ACCOUNT_EMAIL" --quiet
 ```
 
-JFrog OIDC provider and identity mapping are not removed by these commands — delete those manually in JFrog if needed.
+JFrog OIDC provider and identity mapping are not removed by these commands - delete those manually in JFrog if needed.
 
-The Secret Manager service identity (`service-PROJECT_NUMBER@gcp-sa-secretmanager.iam.gserviceaccount.com`) is a project-level resource and is intentionally left in place.
+The Secret Manager service identity (`service-PROJECT_NUMBER@gcp-sa-secretmanager.iam.gserviceaccount.com`) is a
+project-level resource and is intentionally left in place.

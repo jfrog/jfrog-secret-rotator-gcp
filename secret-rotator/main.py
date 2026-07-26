@@ -81,9 +81,7 @@ def rotate_secret_handler(event, context):
         payload_end = token.rfind(".")
         print(f"OIDC token payload: {token[payload_start:payload_end]}")
 
-    exchange_response = exchange_oidc_tokens(
-        token, jfrog_host, provider_name, audience, debug
-    )
+    exchange_response = exchange_oidc_tokens(token, jfrog_host, provider_name, audience, debug)
 
     if "access_token" not in exchange_response:
         print(f"ERROR in JFrog exchange response: {exchange_response}")
@@ -98,9 +96,7 @@ def rotate_secret_handler(event, context):
     prev_secret_version = None
     if prev_secret_action != "KEEP":
         try:
-            prev_secret_version = client.get_secret_version(
-                request={"name": f"{secret_name}/versions/latest"}
-            )
+            prev_secret_version = client.get_secret_version(request={"name": f"{secret_name}/versions/latest"})
             if debug:
                 print(f"Previous secret version: {prev_secret_version.name}")
         except Exception as exc:
@@ -126,15 +122,11 @@ def rotate_secret_handler(event, context):
             and new_secret_version.name != prev_secret_version.name
         ):
             if prev_secret_action == "DESTROY":
-                client.destroy_secret_version(
-                    request={"name": prev_secret_version.name}
-                )
+                client.destroy_secret_version(request={"name": prev_secret_version.name})
                 if debug:
                     print(f"Destroyed previous secret version: {prev_secret_version.name}")
             elif prev_secret_action == "DISABLE":
-                client.disable_secret_version(
-                    request={"name": prev_secret_version.name}
-                )
+                client.disable_secret_version(request={"name": prev_secret_version.name})
                 if debug:
                     print(f"Disabled previous secret version: {prev_secret_version.name}")
             else:
