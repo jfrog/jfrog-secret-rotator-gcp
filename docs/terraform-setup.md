@@ -221,9 +221,12 @@ See [First secret version](manual-setup.md#first-secret-version) for troubleshoo
 ## Optional: Create a Google Artifact Registry connector repository
 
 After all resources are created and the first rotation succeeds, optionally
-[create a Google Artifact Registry connector repository](https://docs.cloud.google.com/artifact-registry/docs/repositories/connector-repo) with your JFrog repository as its custom upstream. Configure basic authentication with the JFrog username and the Secret Manager secret created by Terraform.
+[create a connector repository](https://docs.cloud.google.com/artifact-registry/docs/repositories/connector-repo)
+with your JFrog repository as its custom upstream. Configure basic authentication
+with the JFrog username and the Secret Manager secret created by Terraform.
 
-> **IMPORTANT:** Set the secret version to `latest` so Google Artifact Registry always uses the newest JFrog token after each rotation.
+> **IMPORTANT:** Set the secret version to `latest` so Google Artifact Registry always
+> uses the newest JFrog token after each rotation.
 
 ## Cleanup
 
