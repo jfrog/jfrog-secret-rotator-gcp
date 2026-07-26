@@ -9,8 +9,8 @@ see [CONTRIBUTING.md](CONTRIBUTING.md).)
 setup instructions. It is a working example of a service that rotates a JFrog
 short-lived access token stored in GCP Secret Manager.
 
-The value is integrating that rotating secret with a GAR repository configured
-as a proxy into a JFrog repository.
+The value is integrating that rotating secret with a Google Artifact Registry
+repository configured as a proxy into a JFrog repository.
 
 ## Layout
 

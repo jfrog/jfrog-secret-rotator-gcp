@@ -2,6 +2,10 @@
 
 ## Use case
 
+The primary use case for a rotating JFrog secret is a
+[Google Artifact Registry](https://docs.cloud.google.com/artifact-registry/docs/repositories/connector-overview)
+connector repository that connects to JFrog to pull container images.
+
 Maintain a JFrog access token in Google Secret Manager with regular updates,
 eliminating the need to store persistent JFrog passwords or tokens in the
 rotation function. Rotation is securely controlled using Google identity and
@@ -35,8 +39,8 @@ The function source code is in [`secret-rotator/`](secret-rotator/)
      (see `PREV_SECRET_ACTION`).
 5. **JFrog token exchange** uses OIDC identity mappings to exchange the GCP
    token for a JFrog access token.
-6. **Artifact Registry** reads the rotated token from Secret Manager (GAR
-   Connector mode remote repositories).
+6. **Artifact Registry** reads the rotated token from Secret Manager (Google
+   Artifact Registry Connector mode repositories).
 
 ```mermaid
 sequenceDiagram
@@ -44,7 +48,7 @@ sequenceDiagram
   participant PS as Pub/Sub
   participant CF as Cloud Function
   participant JF as JFrog Access
-  participant GAR as Artifact Registry
+  participant AR as Google Artifact Registry
 
   SM->>PS: rotation notification
   PS->>CF: push message
@@ -53,7 +57,7 @@ sequenceDiagram
   JF-->>CF: access_token
   CF->>SM: add_secret_version
   CF->>SM: handle previous version
-  GAR->>SM: read latest token
+  AR->>SM: read latest token
 ```
 
 ## Setup
@@ -67,5 +71,5 @@ Choose one deployment path:
   provider and identity mapping (`create_jfrog_oidc`, default `true`)
 
 Both paths provision the rotation pipeline and grant the Artifact Registry
-service agent read access to the secret so GAR Connector mode repositories can
-use the rotated token.
+service agent read access to the secret so Google Artifact Registry Connector
+mode repositories can use the rotated token.

@@ -81,8 +81,8 @@ when it handles the first `SECRET_ROTATE` event (see [First secret version](#fir
 
 ## GCP: Artifact Registry access to the secret
 
-Grant the Artifact Registry service agent `roles/secretmanager.secretAccessor` on the secret so GAR Connector mode
-repositories can read the rotated token:
+Grant the Artifact Registry service agent `roles/secretmanager.secretAccessor` on the secret so Artifact Registry
+Connector mode repositories can read the rotated token:
 
 ```bash
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
@@ -92,8 +92,9 @@ gcloud secrets add-iam-policy-binding "$SECRET_NAME" \
   --role="roles/secretmanager.secretAccessor"
 ```
 
-When creating the GAR Connector mode repository, reference the secret by name (e.g. `jfrog-token-rotating`). GAR reads
-the `latest` version, so it picks up new tokens after each rotation.
+When creating the Google Artifact Registry Connector mode repository, reference the secret by name (e.g.
+`jfrog-token-rotating`). Google Artifact Registry reads the `latest` version, so it picks up new tokens after each
+rotation.
 
 ## GCP: Cloud Function (Gen2)
 
@@ -343,8 +344,9 @@ Look for `Successfully rotated secret` in the logs. If rotation fails, common ca
 ### Bootstrap secret version
 
 Terraform seeds the first Secret Manager version with `bootstrap_jfrog_token`, or the placeholder `dummy-token` when
-that is unset. Note that the placeholder is **not** a valid token - GAR and other consumers will fail until the first
-rotation completes. To have a working token immediately, either wait for the first rotation to complete or pre-set
+that is unset. Note that the placeholder is **not** a valid token - Google Artifact Registry and other consumers will
+fail until the first rotation completes. To have a working token immediately, either wait for the first rotation to
+complete or pre-set
 `bootstrap_jfrog_token` with a valid initial JFrog access token. For manual setup, add a real JFrog access token:
 
 ```bash
@@ -402,7 +404,7 @@ Each rotation adds a new Secret Manager version. The rotation function can clean
 | Value | Behavior | When to use |
 | ------- | ---------- | ------------- |
 | `KEEP` | Previous version stays **enabled** | Useful for rollback or debugging; versions accumulate over time. |
-| `DESTROY` | Previous version is **permanently deleted** | Default. Recommended for production. GAR reads `latest`, so old versions are not needed. Reduces secret sprawl and exposure window. |
+| `DESTROY` | Previous version is **permanently deleted** | Default. Recommended for production. Google Artifact Registry reads `latest`, so old versions are not needed. Reduces secret sprawl and exposure window. |
 | `DISABLE` | Previous version is **disabled** (not readable, not deleted) | Middle ground: blocks access but retains metadata for audit. |
 
 With `KEEP`, old versions remain readable by anyone with `secretAccessor`. To remove them manually:
@@ -411,8 +413,15 @@ With `KEEP`, old versions remain readable by anyone with `secretAccessor`. To re
 gcloud secrets versions destroy VERSION_ID --secret="$SECRET_NAME"
 ```
 
-For GAR Connector mode repositories, **`DESTROY` is usually the right choice** - consumers always read the latest
-version and do not benefit from keeping old tokens.
+For Google Artifact Registry Connector mode repositories, **`DESTROY` is usually the right choice** - consumers always
+read the latest version and do not benefit from keeping old tokens.
+
+## Optional: Create a Google Artifact Registry connector repository
+
+After all resources are created and the first rotation succeeds, optionally
+[create a Google Artifact Registry connector repository](https://docs.cloud.google.com/artifact-registry/docs/repositories/connector-repo) with your JFrog repository as its custom upstream. Configure basic authentication with the JFrog username and the Secret Manager secret created above.
+
+> **IMPORTANT:** Set the secret version to `latest` so Google Artifact Registry always uses the newest JFrog token after each rotation.
 
 ## Teardown
 

@@ -8,7 +8,7 @@ The Terraform module packages and deploys the function from [`secret-rotator/`](
 - Required GCP APIs (Secret Manager, Pub/Sub, Cloud Functions, Cloud Run, Eventarc, Artifact Registry, etc.)
 - Secret Manager service identity and Pub/Sub topic with publisher IAM
 - A Secret Manager secret with rotation schedule and event notifications
-- Artifact Registry service agent `secretAccessor` on the rotated secret (for GAR Connector mode repositories)
+- Artifact Registry service agent `secretAccessor` on the rotated secret (for Artifact Registry Connector mode repositories)
 - A Cloud Function (Gen2) triggered by rotation events
 - Service accounts and IAM bindings
 - **JFrog OIDC provider and identity mapping** (when `create_jfrog_oidc = true`, the default)
@@ -61,7 +61,7 @@ After apply, wait for the first rotation (default: ~6 minutes after plan) or tri
 | `audience` | no | `""` | OIDC audience; empty uses secret resource name |
 | `prev_secret_action` | no | `DESTROY` | Previous version handling: `KEEP`, `DESTROY`, or `DISABLE` |
 | `jfrog_debug` | no | `false` | Enable debug logging |
-| `bootstrap_jfrog_token` | no | `dummy-token` placeholder | Initial Secret Manager version for GAR/consumers before first rotation |
+| `bootstrap_jfrog_token` | no | `dummy-token` placeholder | Initial Secret Manager version for Google Artifact Registry/consumers before first rotation |
 
 See [`terraform.tfvars.example`](../terraform-example/terraform.tfvars.example) for a starter configuration.
 
@@ -69,9 +69,9 @@ The first Secret Manager version is seeded with `bootstrap_jfrog_token`, or the 
 that is unset. The rotation function replaces it on the first successful `SECRET_ROTATE` event.
 
 > **Note:** If you leave `bootstrap_jfrog_token` unset, the initial secret version holds the placeholder `dummy-token`,
-> which is **not** a valid JFrog access token. Consumers such as authenticated GAR remote repositories will fail until
-> the first rotation completes. To have a working token immediately after apply, either wait for the first rotation to
-> complete or pre-set `bootstrap_jfrog_token` with a valid initial JFrog access token.
+> which is **not** a valid JFrog access token. Consumers such as authenticated Google Artifact Registry remote
+> repositories will fail until the first rotation completes. To have a working token immediately after apply, either
+> wait for the first rotation to complete or pre-set `bootstrap_jfrog_token` with a valid initial JFrog access token.
 
 ## JFrog OIDC (managed by Terraform)
 
@@ -217,6 +217,13 @@ gcloud functions logs read "$(terraform output -raw cloud_function_name)" --gen2
 ```
 
 See [First secret version](manual-setup.md#first-secret-version) for troubleshooting tips.
+
+## Optional: Create a Google Artifact Registry connector repository
+
+After all resources are created and the first rotation succeeds, optionally
+[create a Google Artifact Registry connector repository](https://docs.cloud.google.com/artifact-registry/docs/repositories/connector-repo) with your JFrog repository as its custom upstream. Configure basic authentication with the JFrog username and the Secret Manager secret created by Terraform.
+
+> **IMPORTANT:** Set the secret version to `latest` so Google Artifact Registry always uses the newest JFrog token after each rotation.
 
 ## Cleanup
 
