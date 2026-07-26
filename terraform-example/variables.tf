@@ -91,7 +91,7 @@ variable "jfrog_access_token" {
 }
 
 variable "bootstrap_jfrog_token" {
-  description = "JFrog access token for the initial Secret Manager version. Set this to a valid token so GAR and other consumers can use the secret immediately after apply. Defaults to the placeholder \"dummy-token\" (not a valid token) when not overridden; the rotation function replaces it on the first rotation."
+  description = "JFrog access token for the initial Secret Manager version. Set this to a valid token so Google Artifact Registry and other consumers can use the secret immediately after apply. Defaults to the placeholder \"dummy-token\" (not a valid token) when not overridden; the rotation function replaces it on the first rotation."
   type        = string
   sensitive   = true
   default     = "dummy-token"

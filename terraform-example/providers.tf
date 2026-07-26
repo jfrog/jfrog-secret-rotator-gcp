@@ -6,23 +6,23 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "5.21.0"
+      version = "7.41.0"
     }
     google-beta = {
       source  = "hashicorp/google-beta"
-      version = "5.21.0"
+      version = "7.41.0"
     }
     archive = {
       source  = "hashicorp/archive"
-      version = "2.4.2"
+      version = "2.8.0"
     }
     random = {
       source  = "hashicorp/random"
-      version = "3.5.1"
+      version = "3.9.0"
     }
     platform = {
       source  = "jfrog/platform"
-      version = "2.2.0"
+      version = "2.2.10"
     }
   }
 }
