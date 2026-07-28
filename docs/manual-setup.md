@@ -420,13 +420,14 @@ read the latest version and do not benefit from keeping old tokens.
 
 After all resources are created and the first rotation succeeds, optionally create a
 [Google Artifact Registry connector repository](https://docs.cloud.google.com/artifact-registry/docs/repositories/connector-repo)
-that proxies a JFrog Docker virtual repository (backed by a local Docker repository), push a tagged Nginx image into
-JFrog, then deploy a public Cloud Run service that pulls that image through the connector.
+that proxies a JFrog Docker virtual repository (backed by a local Docker repository). Then optionally test the connector
+by pushing a tagged Nginx image into JFrog and deploying a public Cloud Run service that pulls that image through the
+connector.
 
 Connector repositories are a **Preview** feature. You need Artifact Registry Admin on the project and
 Secret Manager access for the rotated secret (already granted in
-[Artifact Registry access to the secret](#gcp-artifact-registry-access-to-the-secret)). Docker must be available
-locally to pull, retag, and push the example image.
+[Artifact Registry access to the secret](#gcp-artifact-registry-access-to-the-secret)). For the Cloud Run test, Docker
+must be available locally to pull, retag, and push the example image.
 
 > **IMPORTANT:** Reference the Secret Manager secret version as `latest` so Google Artifact Registry always
 > uses the newest JFrog token after each rotation.
@@ -450,17 +451,19 @@ JFROG_USER="gcp-user"   # must be able to push to local and pull from the virtua
 JFROG_DOCKER_LOCAL="connector-docker-local"
 JFROG_DOCKER_VIRTUAL="connector-docker"
 
-# Artifact Registry connector and Cloud Run example
+# Artifact Registry connector
 CONNECTOR_REPOSITORY="jfrog-docker-connector"
+
+# Cloud Run test (used only in "Test with Cloud Run")
 CLOUD_RUN_SERVICE="nginx-via-jfrog-connector"
 NGINX_SOURCE_IMAGE="nginx:latest"
 NGINX_TAG="jfrog-local"
 NGINX_IMAGE="nginx:${NGINX_TAG}"
 ```
 
-### Set up the connector repository
+### Create the connector repository
 
-Create the JFrog upstream, push the example image, and wire Artifact Registry to that secret-backed connector.
+Create the JFrog upstream and wire Artifact Registry to that secret-backed connector.
 
 #### 1. Create JFrog Docker local and virtual repositories
 
@@ -506,7 +509,28 @@ echo "$JFROG_UPSTREAM_URL"
 
 Ensure `JFROG_USER` can push to `${JFROG_DOCKER_LOCAL}` and pull from `${JFROG_DOCKER_VIRTUAL}`.
 
-#### 2. Pull, tag, and push Nginx to JFrog
+#### 2. Create the Artifact Registry connector repository
+
+Confirm a usable JFrog token is in Secret Manager (`gcloud secrets versions access latest --secret="$SECRET_NAME"`)
+before creating the connector. Create the connector with basic auth against that secret:
+
+```bash
+gcloud artifacts repositories create "$CONNECTOR_REPOSITORY" \
+  --project="$PROJECT_ID" \
+  --location="$REGION" \
+  --description="Connector to JFrog ${JFROG_DOCKER_VIRTUAL}" \
+  --repository-format=docker \
+  --mode=connector-repository \
+  --remote-docker-repo="$JFROG_UPSTREAM_URL" \
+  --remote-username="$JFROG_USER" \
+  --remote-password-secret-version="projects/${PROJECT_ID}/secrets/${SECRET_NAME}/versions/latest"
+```
+
+### Test with Cloud Run
+
+Push an example Nginx image to JFrog, deploy it on Cloud Run through the connector, and confirm the pull path works.
+
+#### 1. Pull, tag, and push Nginx to JFrog
 
 Pull `nginx:latest` from Docker Hub on your machine, retag it for the JFrog local repository with the special tag
 `${NGINX_TAG}`, and push it to Artifactory.
@@ -532,35 +556,14 @@ curl -sS -H "Authorization: Bearer ${JFROG_ADMIN_TOKEN}" \
   "${JFROG_URL}/artifactory/api/docker/${JFROG_DOCKER_LOCAL}/v2/nginx/tags/list"
 ```
 
-#### 3. Create the Artifact Registry connector repository
-
-Confirm a usable JFrog token is in Secret Manager (`gcloud secrets versions access latest --secret="$SECRET_NAME"`)
-before creating the connector. Create the connector with basic auth against that secret:
-
-```bash
-gcloud artifacts repositories create "$CONNECTOR_REPOSITORY" \
-  --project="$PROJECT_ID" \
-  --location="$REGION" \
-  --description="Connector to JFrog ${JFROG_DOCKER_VIRTUAL}" \
-  --repository-format=docker \
-  --mode=connector-repository \
-  --remote-docker-repo="$JFROG_UPSTREAM_URL" \
-  --remote-username="$JFROG_USER" \
-  --remote-password-secret-version="projects/${PROJECT_ID}/secrets/${SECRET_NAME}/versions/latest"
-```
-
-Image path for consumers (Cloud Run below) - same image name and tag pushed to JFrog, resolved via the connector:
+Image path for Cloud Run - same image name and tag pushed to JFrog, resolved via the connector:
 
 ```bash
 CONNECTOR_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${CONNECTOR_REPOSITORY}/${NGINX_IMAGE}"
 echo "$CONNECTOR_IMAGE"
 ```
 
-### Test with Cloud Run
-
-Deploy Nginx from the connector image and confirm Cloud Run can pull through Artifact Registry into JFrog.
-
-#### 1. Deploy Nginx on Cloud Run via the connector
+#### 2. Deploy Nginx on Cloud Run via the connector
 
 Pulls go through Artifact Registry -> JFrog virtual -> JFrog local (`nginx:jfrog-local`). Set container port to `80`
 (Nginx listens on 80; Cloud Run defaults to 8080). Allow unauthenticated access for this example:
@@ -577,7 +580,7 @@ gcloud run deploy "$CLOUD_RUN_SERVICE" \
 > **Note:** Some organizations deny `allUsers` on Cloud Run (`roles/run.invoker`). If deploy fails on public access,
 > omit `--allow-unauthenticated` and invoke the service with an identity that has `roles/run.invoker`.
 
-#### 2. Print and verify the service URL
+#### 3. Print and verify the service URL
 
 ```bash
 CLOUD_RUN_URL=$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
