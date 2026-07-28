@@ -418,13 +418,181 @@ read the latest version and do not benefit from keeping old tokens.
 
 ## Optional: Create a Google Artifact Registry connector repository
 
-After all resources are created and the first rotation succeeds, optionally
-[create a connector repository](https://docs.cloud.google.com/artifact-registry/docs/repositories/connector-repo)
-with your JFrog repository as its custom upstream. Configure basic authentication
-with the JFrog username and the Secret Manager secret created above.
+After all resources are created and the first rotation succeeds, optionally create a
+[Google Artifact Registry connector repository](https://docs.cloud.google.com/artifact-registry/docs/repositories/connector-repo)
+that proxies a JFrog Docker virtual repository (backed by a local Docker repository). Then optionally test the connector
+by pushing a tagged Nginx image into JFrog and deploying a public Cloud Run service that pulls that image through the
+connector.
 
-> **IMPORTANT:** Set the secret version to `latest` so Google Artifact Registry always
+Connector repositories are a **Preview** feature. You need Artifact Registry Admin on the project and
+Secret Manager access for the rotated secret (already granted in
+[Artifact Registry access to the secret](#gcp-artifact-registry-access-to-the-secret)). For the Cloud Run test, Docker
+must be available locally to pull, retag, and push the example image.
+
+> **IMPORTANT:** Reference the Secret Manager secret version as `latest` so Google Artifact Registry always
 > uses the newest JFrog token after each rotation.
+
+### Prepare Variables
+
+Reuse values from earlier steps where possible. Override repository names if you already have JFrog Docker
+repositories to use as the connector upstream - then skip the matching create commands below.
+
+```bash
+# Reuse from earlier sections (adjust if needed)
+PROJECT_ID="my-gcp-project"
+REGION="us-central1"
+SECRET_NAME="jfrog-token-rotating"
+JFROG_HOST="myregistry.jfrog.io"
+JFROG_URL="https://${JFROG_HOST}"
+JFROG_ADMIN_TOKEN="your-admin-access-token"
+JFROG_USER="gcp-user"   # must be able to push to local and pull from the virtual Docker repository
+
+# Overridable - set to existing repo keys and skip create if they already exist
+JFROG_DOCKER_LOCAL="connector-docker-local"
+JFROG_DOCKER_VIRTUAL="connector-docker"
+
+# Artifact Registry connector
+CONNECTOR_REPOSITORY="jfrog-docker-connector"
+
+# Cloud Run test (used only in "Test with Cloud Run")
+CLOUD_RUN_SERVICE="nginx-via-jfrog-connector"
+NGINX_SOURCE_IMAGE="nginx:latest"
+NGINX_TAG="jfrog-local"
+NGINX_IMAGE="nginx:${NGINX_TAG}"
+```
+
+### Create the connector repository
+
+Create the JFrog upstream and wire Artifact Registry to that secret-backed connector.
+
+#### 1. Create JFrog Docker local and virtual repositories
+
+Skip either `curl` if the repository already exists and you pointed the variables at it.
+
+Create a local Docker repository:
+
+```bash
+curl -X PUT "${JFROG_URL}/artifactory/api/repositories/${JFROG_DOCKER_LOCAL}" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${JFROG_ADMIN_TOKEN}" \
+  -d "{
+    \"key\": \"${JFROG_DOCKER_LOCAL}\",
+    \"rclass\": \"local\",
+    \"packageType\": \"docker\",
+    \"description\": \"Local Docker repo for Artifact Registry connector example\",
+    \"dockerApiVersion\": \"V2\"
+  }"
+```
+
+Create a virtual Docker repository that fronts the local repository (and accepts deploys into it):
+
+```bash
+curl -X PUT "${JFROG_URL}/artifactory/api/repositories/${JFROG_DOCKER_VIRTUAL}" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${JFROG_ADMIN_TOKEN}" \
+  -d "{
+    \"key\": \"${JFROG_DOCKER_VIRTUAL}\",
+    \"rclass\": \"virtual\",
+    \"packageType\": \"docker\",
+    \"description\": \"Virtual Docker repo for Artifact Registry connector example\",
+    \"repositories\": [\"${JFROG_DOCKER_LOCAL}\"],
+    \"defaultDeploymentRepo\": \"${JFROG_DOCKER_LOCAL}\"
+  }"
+```
+
+Upstream URL for the Artifact Registry connector:
+
+```bash
+JFROG_UPSTREAM_URL="${JFROG_URL}/${JFROG_DOCKER_VIRTUAL}"
+echo "$JFROG_UPSTREAM_URL"
+```
+
+Ensure `JFROG_USER` can push to `${JFROG_DOCKER_LOCAL}` and pull from `${JFROG_DOCKER_VIRTUAL}`.
+
+#### 2. Create the Artifact Registry connector repository
+
+Confirm a usable JFrog token is in Secret Manager (`gcloud secrets versions access latest --secret="$SECRET_NAME"`)
+before creating the connector. Create the connector with basic auth against that secret:
+
+```bash
+gcloud artifacts repositories create "$CONNECTOR_REPOSITORY" \
+  --project="$PROJECT_ID" \
+  --location="$REGION" \
+  --description="Connector to JFrog ${JFROG_DOCKER_VIRTUAL}" \
+  --repository-format=docker \
+  --mode=connector-repository \
+  --remote-docker-repo="$JFROG_UPSTREAM_URL" \
+  --remote-username="$JFROG_USER" \
+  --remote-password-secret-version="projects/${PROJECT_ID}/secrets/${SECRET_NAME}/versions/latest"
+```
+
+### Test with Cloud Run
+
+Push an example Nginx image to JFrog, deploy it on Cloud Run through the connector, and confirm the pull path works.
+
+#### 1. Pull, tag, and push Nginx to JFrog
+
+Pull `nginx:latest` from Docker Hub on your machine, retag it for the JFrog local repository with the special tag
+`${NGINX_TAG}`, and push it to Artifactory.
+
+Use `--platform linux/amd64` so the image runs on Cloud Run (amd64). On Apple Silicon (`arm64`), a default
+`docker pull` stores an arm64 image; Cloud Run then fails with `exec format error` / "failed to load
+/docker-entrypoint.sh".
+
+```bash
+docker pull --platform linux/amd64 "$NGINX_SOURCE_IMAGE"
+
+JFROG_NGINX_IMAGE="${JFROG_HOST}/${JFROG_DOCKER_LOCAL}/${NGINX_IMAGE}"
+docker tag "$NGINX_SOURCE_IMAGE" "$JFROG_NGINX_IMAGE"
+
+echo "$JFROG_ADMIN_TOKEN" | docker login "$JFROG_HOST" -u "$JFROG_USER" --password-stdin
+docker push "$JFROG_NGINX_IMAGE"
+```
+
+Confirm the image is present (optional):
+
+```bash
+curl -sS -H "Authorization: Bearer ${JFROG_ADMIN_TOKEN}" \
+  "${JFROG_URL}/artifactory/api/docker/${JFROG_DOCKER_LOCAL}/v2/nginx/tags/list"
+```
+
+Image path for Cloud Run - same image name and tag pushed to JFrog, resolved via the connector:
+
+```bash
+CONNECTOR_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${CONNECTOR_REPOSITORY}/${NGINX_IMAGE}"
+echo "$CONNECTOR_IMAGE"
+```
+
+#### 2. Deploy Nginx on Cloud Run via the connector
+
+Pulls go through Artifact Registry -> JFrog virtual -> JFrog local (`nginx:jfrog-local`). Set container port to `80`
+(Nginx listens on 80; Cloud Run defaults to 8080). Allow unauthenticated access for this example:
+
+```bash
+gcloud run deploy "$CLOUD_RUN_SERVICE" \
+  --project="$PROJECT_ID" \
+  --region="$REGION" \
+  --image="$CONNECTOR_IMAGE" \
+  --port=80 \
+  --allow-unauthenticated
+```
+
+> **Note:** Some organizations deny `allUsers` on Cloud Run (`roles/run.invoker`). If deploy fails on public access,
+> omit `--allow-unauthenticated` and invoke the service with an identity that has `roles/run.invoker`.
+
+#### 3. Print and verify the service URL
+
+```bash
+CLOUD_RUN_URL=$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+  --project="$PROJECT_ID" \
+  --region="$REGION" \
+  --format='value(status.url)')
+echo "Cloud Run Nginx URL: ${CLOUD_RUN_URL}"
+
+curl -sS -o /dev/null -w "%{http_code}\n" "$CLOUD_RUN_URL"
+```
+
+A successful pull path returns HTTP `200` and the default Nginx welcome page at `$CLOUD_RUN_URL`.
 
 ## Teardown
 
@@ -441,6 +609,29 @@ PUBSUB_TOPIC_NAME="my-rotation-topic"
 PUBSUB_SUBSCRIPTION_NAME="my-rotation-subscription"
 FUNCTION_SERVICE_ACCOUNT="jfrog-secret-rotator-sa"
 FUNCTION_SERVICE_ACCOUNT_EMAIL="${FUNCTION_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com"
+
+# Optional connector / Cloud Run example (skip if you did not create them)
+CONNECTOR_REPOSITORY="jfrog-docker-connector"
+CLOUD_RUN_SERVICE="nginx-via-jfrog-connector"
+
+# Optional JFrog repos from the connector example (only delete if this guide created them)
+JFROG_HOST="myregistry.jfrog.io"
+JFROG_URL="https://${JFROG_HOST}"
+JFROG_ADMIN_TOKEN="your-admin-access-token"
+JFROG_DOCKER_LOCAL="connector-docker-local"
+JFROG_DOCKER_VIRTUAL="connector-docker"
+
+# 0a. Optional: delete Cloud Run Nginx example
+gcloud run services delete "$CLOUD_RUN_SERVICE" \
+  --project="$PROJECT_ID" \
+  --region="$REGION" \
+  --quiet
+
+# 0b. Optional: delete Artifact Registry connector repository
+gcloud artifacts repositories delete "$CONNECTOR_REPOSITORY" \
+  --project="$PROJECT_ID" \
+  --location="$REGION" \
+  --quiet
 
 # 1. Delete Cloud Function (Gen2) - also removes the Eventarc trigger and Cloud Run service
 gcloud functions delete "$FUNCTION_NAME" --gen2 --region="$REGION" --quiet
@@ -469,6 +660,19 @@ gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
 
 # 7. Delete the function service account
 gcloud iam service-accounts delete "$FUNCTION_SERVICE_ACCOUNT_EMAIL" --quiet
+```
+
+### Optional: delete JFrog Docker repositories from this example
+
+Only run these if this guide created the repositories. **Do not** delete reused existing repositories.
+
+```bash
+# Virtual first, then local
+curl -X DELETE "${JFROG_URL}/artifactory/api/repositories/${JFROG_DOCKER_VIRTUAL}" \
+  -H "Authorization: Bearer ${JFROG_ADMIN_TOKEN}"
+
+curl -X DELETE "${JFROG_URL}/artifactory/api/repositories/${JFROG_DOCKER_LOCAL}" \
+  -H "Authorization: Bearer ${JFROG_ADMIN_TOKEN}"
 ```
 
 JFrog OIDC provider and identity mapping are not removed by these commands - delete those manually in JFrog if needed.
