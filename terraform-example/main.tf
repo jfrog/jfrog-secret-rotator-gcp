@@ -5,24 +5,33 @@ data "google_project" "current" {
 }
 
 locals {
-  next_rotation_time        = coalesce(var.next_rotation_time, timeadd(plantimestamp(), "360s"))
-  rotation_period_seconds   = tonumber(regex("^([0-9]+)s$", var.rotation_period)[0])
-  oidc_audience             = var.audience != "" ? var.audience : "projects/${data.google_project.current.number}/secrets/${google_secret_manager_secret.jfrog_token.secret_id}"
-  jfrog_token_expires_in    = coalesce(var.jfrog_token_expires_in, ceil(local.rotation_period_seconds * 1.3))
+  next_rotation_time      = coalesce(var.next_rotation_time, timeadd(plantimestamp(), "360s"))
+  rotation_period_seconds = tonumber(regex("^([0-9]+)s$", var.rotation_period)[0])
+  oidc_audience           = var.audience != "" ? var.audience : "projects/${data.google_project.current.number}/secrets/${google_secret_manager_secret.jfrog_token.secret_id}"
+  jfrog_token_expires_in  = coalesce(var.jfrog_token_expires_in, ceil(local.rotation_period_seconds * 1.3))
+
+  # DESTROY deletes the Terraform-managed bootstrap version; the next apply recreates
+  # it as versions/latest (often the dummy placeholder) and breaks Artifact Registry
+  # connector pulls. Keep or disable previous versions when the Cloud Run example is on.
+  effective_prev_secret_action = (
+    var.create_cloud_run_example && var.prev_secret_action == "DESTROY"
+    ? "KEEP"
+    : var.prev_secret_action
+  )
 
   function_env_vars = merge(
     {
       JFROG_HOST         = var.jfrog_host
       PROVIDER_NAME      = var.provider_name
-      PREV_SECRET_ACTION = var.prev_secret_action
+      PREV_SECRET_ACTION = local.effective_prev_secret_action
       JFROG_DEBUG        = var.jfrog_debug ? "true" : "false"
     },
     var.audience != "" ? { AUDIENCE = var.audience } : {}
   )
 
-  secret_manager_service_agent      = "service-${data.google_project.current.number}@gcp-sa-secretmanager.iam.gserviceaccount.com"
-  pubsub_service_agent              = "service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
-  artifact_registry_service_agent   = "service-${data.google_project.current.number}@gcp-sa-artifactregistry.iam.gserviceaccount.com"
+  secret_manager_service_agent    = "service-${data.google_project.current.number}@gcp-sa-secretmanager.iam.gserviceaccount.com"
+  pubsub_service_agent            = "service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  artifact_registry_service_agent = "service-${data.google_project.current.number}@gcp-sa-artifactregistry.iam.gserviceaccount.com"
 
   required_apis = [
     "secretmanager.googleapis.com",
@@ -116,7 +125,7 @@ resource "google_project_iam_member" "rotator_secret_editor" {
   project = var.project_id
   role    = "roles/secretmanager.editor"
 
-  member  = "serviceAccount:${google_service_account.rotator.email}"
+  member = "serviceAccount:${google_service_account.rotator.email}"
 
   condition {
     title       = "limit to single secret"

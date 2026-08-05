@@ -21,6 +21,18 @@ jfrog_user        = "gcp-user" # must exist in JFrog when create_jfrog_oidc is t
 # function_name               = "secret-rotation-function"
 # function_service_account_id = "secret-rotator-sa"
 # audience                    = "jfrog_user1"
-# prev_secret_action          = "KEEP"  # default is DESTROY; set KEEP or DISABLE to retain old versions — see docs/manual-setup.md
+# prev_secret_action          = "KEEP"  # default is DESTROY; set KEEP or DISABLE to retain old versions - see docs/manual-setup.md
 # jfrog_debug                 = false
 # next_rotation_time          = "2026-07-09T12:00:00Z"
+
+# Optional Artifact Registry connector + Cloud Run Nginx example
+# First apply waits for the scheduled SECRET_ROTATE (~6 minutes) before creating the connector.
+# create_cloud_run_example    = true
+# create_jfrog_docker_repos   = true   # set false to reuse existing JFrog Docker repos
+# jfrog_docker_local_key      = "connector-docker-local"
+# jfrog_docker_remote_key     = "connector-docker-remote"
+# jfrog_docker_virtual_key    = "connector-docker"
+# connector_repository_id     = "jfrog-docker-connector"
+# cloud_run_service_name      = "nginx-via-jfrog-connector"
+# cloud_run_image_name        = "nginx"
+# cloud_run_image_tag         = "latest"  # pulled from Docker Hub through Artifactory

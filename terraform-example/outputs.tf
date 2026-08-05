@@ -49,3 +49,38 @@ output "cloud_function_name" {
   description = "Deployed Cloud Function name."
   value       = google_cloudfunctions2_function.rotator.name
 }
+
+output "create_cloud_run_example" {
+  description = "Whether Terraform manages the optional Artifact Registry connector and Cloud Run Nginx example."
+  value       = var.create_cloud_run_example
+}
+
+output "connector_repository_id" {
+  description = "Artifact Registry connector repository ID (null when create_cloud_run_example is false)."
+  value       = try(google_artifact_registry_repository.jfrog_connector[0].repository_id, null)
+}
+
+output "connector_image" {
+  description = "Image path Cloud Run pulls via the connector (null when create_cloud_run_example is false)."
+  value       = var.create_cloud_run_example ? local.connector_image : null
+}
+
+output "cloud_run_service_url" {
+  description = "URL of the optional Cloud Run Nginx example (null when create_cloud_run_example is false)."
+  value       = try(google_cloud_run_v2_service.nginx_example[0].uri, null)
+}
+
+output "jfrog_docker_local_key" {
+  description = "JFrog local Docker repository key used by the Cloud Run example."
+  value       = var.create_cloud_run_example ? local.jfrog_docker_local_key : null
+}
+
+output "jfrog_docker_remote_key" {
+  description = "JFrog remote Docker Hub repository key used by the Cloud Run example."
+  value       = var.create_cloud_run_example ? local.jfrog_docker_remote_key : null
+}
+
+output "jfrog_docker_virtual_key" {
+  description = "JFrog virtual Docker repository key used as the connector upstream."
+  value       = var.create_cloud_run_example ? local.jfrog_docker_virtual_key : null
+}
