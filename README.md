@@ -68,7 +68,9 @@ Choose one deployment path:
   `gcloud` commands and JFrog OIDC configuration via curl
 - **[Terraform setup](docs/terraform-setup.md)** - Infrastructure-as-Code via
   [`terraform-example/`](terraform-example/); optionally creates JFrog OIDC
-  provider and identity mapping (`create_jfrog_oidc`, default `true`)
+  provider and identity mapping (`create_jfrog_oidc`, default `true`), and an
+  optional Artifact Registry connector + Cloud Run Nginx example
+  (`create_cloud_run_example`)
 
 Both paths provision the rotation pipeline and grant the Artifact Registry
 service agent read access to the secret so Google Artifact Registry Connector

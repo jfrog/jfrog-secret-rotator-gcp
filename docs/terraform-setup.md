@@ -12,6 +12,9 @@ The Terraform module packages and deploys the function from [`secret-rotator/`](
 - A Cloud Function (Gen2) triggered by rotation events
 - Service accounts and IAM bindings
 - **JFrog OIDC provider and identity mapping** (when `create_jfrog_oidc = true`, the default)
+- **Optional connector + Cloud Run example** (when `create_cloud_run_example = true`): JFrog local + Docker Hub
+  remote + virtual Docker repos, Artifact Registry connector (`no_cache`), and a public Nginx Cloud Run service
+  that pulls `nginx:latest` through Artifactory
 
 ## Prerequisites
 
@@ -38,6 +41,20 @@ terraform apply
 
 After apply, wait for the first rotation (default: ~6 minutes after plan) or trigger one manually.
 
+When `create_cloud_run_example = true`, Terraform itself waits for that first rotation (printing reason and time
+left) before creating the Artifact Registry connector, so a single apply can cover rotator + connector + Cloud Run.
+The wait exits immediately if `versions/latest` is already a real token.
+
+Unless you pin `next_rotation_time`, every apply reschedules the first rotation to ~6 minutes after that plan, so
+repeated applies keep deferring a *new* scheduled rotation (the connector wait resource does not re-sleep on later
+applies). To rotate on demand instead of waiting on the schedule, publish a `SECRET_ROTATE` event:
+
+```bash
+gcloud pubsub topics publish "$(terraform output -raw pubsub_topic_id)" \
+  --attribute=eventType=SECRET_ROTATE \
+  --message="{\"name\":\"projects/$(terraform output -raw project_number)/secrets/$(terraform output -raw secret_id)\"}"
+```
+
 ## Variables
 
 | Variable | Required | Default | Description |
@@ -49,8 +66,8 @@ After apply, wait for the first rotation (default: ~6 minutes after plan) or tri
 | `jfrog_host` | yes | - | JFrog hostname (e.g. `myregistry.jfrog.io`) |
 | `provider_name` | yes | - | JFrog OIDC provider name |
 | `create_jfrog_oidc` | no | `true` | Create JFrog OIDC provider and identity mapping via Terraform |
-| `jfrog_user` | when `create_jfrog_oidc` | - | Existing JFrog username for the identity mapping |
-| `jfrog_access_token` | when `create_jfrog_oidc` | - | JFrog admin token; can use `JFROG_ACCESS_TOKEN` env var instead |
+| `jfrog_user` | when `create_jfrog_oidc` or `create_cloud_run_example` | - | JFrog username for OIDC mapping and connector upstream auth |
+| `jfrog_access_token` | when OIDC or JFrog Docker repos are created | - | JFrog admin token; can use `JFROG_ACCESS_TOKEN` env var instead |
 | `jfrog_token_expires_in` | no | `rotation_period × 1.3` | JFrog access token lifetime (seconds) in the identity mapping |
 | `oidc_mapping_name` | no | `provider_name` | Name of the JFrog OIDC identity mapping |
 | `oidc_mapping_priority` | no | `1` | Identity mapping priority (lower = higher priority) |
@@ -59,9 +76,18 @@ After apply, wait for the first rotation (default: ~6 minutes after plan) or tri
 | `function_service_account_id` | no | `secret-rotator-sa` | Function service account short name |
 | `next_rotation_time` | no | ~6 min after plan | RFC3339 timestamp for first rotation |
 | `audience` | no | `""` | OIDC audience; empty uses secret resource name |
-| `prev_secret_action` | no | `DESTROY` | Previous version handling: `KEEP`, `DESTROY`, or `DISABLE` |
+| `prev_secret_action` | no | `DESTROY` | Previous version handling: `KEEP`, `DESTROY`, or `DISABLE`. With `create_cloud_run_example`, `DESTROY` is coerced to `KEEP` |
 | `jfrog_debug` | no | `false` | Enable debug logging |
 | `bootstrap_jfrog_token` | no | `dummy-token` placeholder | Initial Secret Manager version for Google Artifact Registry/consumers before first rotation |
+| `create_cloud_run_example` | no | `false` | Create Artifact Registry connector + Cloud Run Nginx example; apply waits for first rotation when needed |
+| `create_jfrog_docker_repos` | no | `true` | When the Cloud Run example is enabled, create JFrog local+remote+virtual Docker repos (set `false` to reuse existing keys) |
+| `jfrog_docker_local_key` | no | `connector-docker-local` | JFrog local Docker repository key |
+| `jfrog_docker_remote_key` | no | `connector-docker-remote` | JFrog remote Docker Hub repository key |
+| `jfrog_docker_virtual_key` | no | `connector-docker` | JFrog virtual Docker repository key (connector upstream) |
+| `connector_repository_id` | no | `jfrog-docker-connector` | Artifact Registry connector repository ID |
+| `cloud_run_service_name` | no | `nginx-via-jfrog-connector` | Cloud Run service name |
+| `cloud_run_image_name` | no | `nginx` | Image name pulled via the connector |
+| `cloud_run_image_tag` | no | `latest` | Image tag pulled via the connector (from Docker Hub through Artifactory) |
 
 See [`terraform.tfvars.example`](../terraform-example/terraform.tfvars.example) for a starter configuration.
 
@@ -169,6 +195,13 @@ terraform output create_jfrog_oidc
 | `secret_resource_name` | Full secret resource path |
 | `project_number` | Project number for identity mapping |
 | `cloud_function_name` | Deployed function name |
+| `create_cloud_run_example` | Whether the connector + Cloud Run example is managed |
+| `connector_repository_id` | Artifact Registry connector repository ID |
+| `connector_image` | Image path Cloud Run pulls via the connector |
+| `cloud_run_service_url` | Public URL of the Nginx Cloud Run example |
+| `jfrog_docker_local_key` | JFrog local Docker repository key |
+| `jfrog_docker_remote_key` | JFrog remote Docker Hub repository key |
+| `jfrog_docker_virtual_key` | JFrog virtual Docker repository key |
 
 When `create_jfrog_oidc = false`, use these outputs to configure or verify your existing identity mapping:
 
@@ -218,15 +251,47 @@ gcloud functions logs read "$(terraform output -raw cloud_function_name)" --gen2
 
 See [First secret version](manual-setup.md#first-secret-version) for troubleshooting tips.
 
-## Optional: Create a Google Artifact Registry connector repository
+## Optional: Artifact Registry connector and Cloud Run example
 
-After all resources are created and the first rotation succeeds, optionally
-[create a connector repository](https://docs.cloud.google.com/artifact-registry/docs/repositories/connector-repo)
-with your JFrog repository as its custom upstream. Configure basic authentication
-with the JFrog username and the Secret Manager secret created by Terraform.
+Set `create_cloud_run_example = true` to provision the same optional path documented in
+[Manual setup](manual-setup.md#optional-create-a-google-artifact-registry-connector-repository):
 
-> **IMPORTANT:** Set the secret version to `latest` so Google Artifact Registry always
-> uses the newest JFrog token after each rotation.
+1. JFrog Docker **local** (`jfrog_docker_local_key`), **remote** to Docker Hub (`jfrog_docker_remote_key`), and
+   **virtual** (`jfrog_docker_virtual_key`) repositories - skip creation with `create_jfrog_docker_repos = false`
+   when reusing existing keys
+2. Artifact Registry **connector** repository (`connector_repository_id`) pointing at
+   `https://<jfrog_host>/<virtual_key>`, authenticated with `jfrog_user` and Secret Manager
+   `versions/latest` ([`no_cache` connector mode](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/artifact_registry_repository))
+3. Public Cloud Run service pulling `<image_name>:<image_tag>` (defaults `nginx:latest`) through the connector on
+   port 80 - Artifactory resolves the image from Docker Hub via the remote repository (no local image push)
+
+Apply order when the example is enabled:
+
+1. Provision the rotator (secret, function, OIDC, IAM) and schedule the first rotation (~6 minutes after plan by
+   default).
+2. `null_resource.wait_for_first_rotation` runs
+   [`scripts/wait_for_first_rotation.sh`](../terraform-example/scripts/wait_for_first_rotation.sh), which counts down
+   360 seconds (printing reason and seconds left) and confirms `versions/latest` is no longer the bootstrap
+   placeholder (exits immediately if already rotated). Requires `gcloud` on the machine running `terraform apply`.
+3. Create the Artifact Registry connector and Cloud Run service only after that check succeeds.
+
+If `prev_secret_action` is `DESTROY` while the example is enabled, Terraform sets the function's `PREV_SECRET_ACTION`
+to `KEEP` instead. Destroying the Terraform-managed bootstrap version would recreate it as `versions/latest` on the
+next apply and break connector pulls with `401: Unauthorized error returned by the external repository`.
+
+Requires `hashicorp/google` **7.43.0+** for `no_cache` (pinned in
+[`providers.tf`](../terraform-example/providers.tf); `google-beta` is pinned to **7.42.0** until a matching
+beta release is published).
+
+Verify with:
+
+```bash
+terraform output -raw cloud_run_service_url
+curl -sS -o /dev/null -w "%{http_code}\n" "$(terraform output -raw cloud_run_service_url)"
+```
+
+> **Note:** Some organizations deny `allUsers` on Cloud Run. If public access fails, remove or adjust the
+> `google_cloud_run_v2_service_iam_member.nginx_public` binding.
 
 ## Cleanup
 
@@ -234,6 +299,9 @@ When `create_jfrog_oidc = true`, `terraform destroy` removes the JFrog OIDC prov
 resources.
 
 When `create_jfrog_oidc = false`, only GCP resources are destroyed; JFrog OIDC configuration remains.
+
+When `create_cloud_run_example = true` and `create_jfrog_docker_repos = true`, destroy also removes the managed JFrog
+Docker local, remote, and virtual repositories. Reused repos (`create_jfrog_docker_repos = false`) are left in place.
 
 ```bash
 cd terraform-example

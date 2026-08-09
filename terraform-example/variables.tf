@@ -61,7 +61,7 @@ variable "audience" {
 }
 
 variable "prev_secret_action" {
-  description = "Action on the previous secret version after rotation: KEEP, DESTROY, or DISABLE."
+  description = "Action on the previous secret version after rotation: KEEP, DESTROY, or DISABLE. When create_cloud_run_example is true and this is DESTROY, Terraform uses KEEP instead so the managed bootstrap version is not deleted and recreated as versions/latest."
   type        = string
   default     = "DESTROY"
 
@@ -84,7 +84,7 @@ variable "create_jfrog_oidc" {
 }
 
 variable "jfrog_access_token" {
-  description = "JFrog platform admin access token for OIDC resources. Required when create_jfrog_oidc is true unless JFROG_ACCESS_TOKEN is set."
+  description = "JFrog platform admin access token for OIDC and optional Artifactory Docker repos. Required when create_jfrog_oidc or create_jfrog_docker_repos is true unless JFROG_ACCESS_TOKEN is set."
   type        = string
   sensitive   = true
   default     = null
@@ -98,13 +98,13 @@ variable "bootstrap_jfrog_token" {
 }
 
 variable "jfrog_user" {
-  description = "Existing JFrog username for the OIDC identity mapping (token_spec.username). Required when create_jfrog_oidc is true."
+  description = "Existing JFrog username for the OIDC identity mapping and Artifact Registry connector upstream auth. Required when create_jfrog_oidc or create_cloud_run_example is true."
   type        = string
   default     = null
 
   validation {
-    condition     = !var.create_jfrog_oidc || (var.jfrog_user != null && var.jfrog_user != "")
-    error_message = "jfrog_user is required when create_jfrog_oidc is true."
+    condition     = (!var.create_jfrog_oidc && !var.create_cloud_run_example) || (var.jfrog_user != null && var.jfrog_user != "")
+    error_message = "jfrog_user is required when create_jfrog_oidc or create_cloud_run_example is true."
   }
 }
 
@@ -124,4 +124,58 @@ variable "oidc_mapping_priority" {
   description = "Priority of the JFrog OIDC identity mapping (lower number = higher priority)."
   type        = number
   default     = 1
+}
+
+variable "create_cloud_run_example" {
+  description = "When true, create JFrog Docker local+remote+virtual repos (unless create_jfrog_docker_repos is false), an Artifact Registry connector repository, and a public Cloud Run Nginx service that pulls nginx:latest through the connector. Apply waits for the first SECRET_ROTATE (about 6 minutes by default) before creating the connector unless versions/latest is already a real token. See docs/terraform-setup.md."
+  type        = bool
+  default     = false
+}
+
+variable "create_jfrog_docker_repos" {
+  description = "When create_cloud_run_example is true, create the JFrog local, remote (Docker Hub), and virtual Docker repositories via the Artifactory provider. Set false to reuse existing repositories named by jfrog_docker_*_key."
+  type        = bool
+  default     = true
+}
+
+variable "jfrog_docker_local_key" {
+  description = "JFrog local Docker repository key used by the Cloud Run example."
+  type        = string
+  default     = "connector-docker-local"
+}
+
+variable "jfrog_docker_remote_key" {
+  description = "JFrog remote Docker repository key (Docker Hub proxy) used by the Cloud Run example."
+  type        = string
+  default     = "connector-docker-remote"
+}
+
+variable "jfrog_docker_virtual_key" {
+  description = "JFrog virtual Docker repository key used as the Artifact Registry connector upstream."
+  type        = string
+  default     = "connector-docker"
+}
+
+variable "connector_repository_id" {
+  description = "Artifact Registry connector repository ID."
+  type        = string
+  default     = "jfrog-docker-connector"
+}
+
+variable "cloud_run_service_name" {
+  description = "Cloud Run service name for the Nginx connector example."
+  type        = string
+  default     = "nginx-via-jfrog-connector"
+}
+
+variable "cloud_run_image_name" {
+  description = "Image name pulled via the connector (e.g. nginx)."
+  type        = string
+  default     = "nginx"
+}
+
+variable "cloud_run_image_tag" {
+  description = "Image tag pulled via the connector from Docker Hub through Artifactory (e.g. latest)."
+  type        = string
+  default     = "latest"
 }
